@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Animated,
+  Easing,
   StatusBar,
   StyleSheet,
   Text,
@@ -19,6 +21,75 @@ const features = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const logoScale = useRef(new Animated.Value(0.6)).current;
+  const logoRotate = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslate = useRef(new Animated.Value(12)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslate = useRef(new Animated.Value(26)).current;
+
+  // Kick off entry and ongoing sway animations for the hero area
+  useEffect(() => {
+    const logoEntry = Animated.spring(logoScale, {
+      toValue: 1,
+      friction: 6,
+      tension: 60,
+      useNativeDriver: true,
+    });
+
+    logoRotate.setValue(0);
+    const logoSway = Animated.loop(
+      Animated.timing(logoRotate, {
+        toValue: 1,
+        duration: 3200,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      })
+    );
+
+    const titleAnimation = Animated.sequence([
+      Animated.delay(180),
+      Animated.parallel([
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslate, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    const cardAnimation = Animated.sequence([
+      Animated.delay(380),
+      Animated.parallel([
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardTranslate, {
+          toValue: 0,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    logoEntry.start(() => logoSway.start());
+    titleAnimation.start();
+    cardAnimation.start();
+
+    return () => {
+      logoEntry.stop();
+      logoSway.stop();
+      titleAnimation.stop();
+      cardAnimation.stop();
+    };
+  }, [logoScale, logoRotate, titleOpacity, titleTranslate, cardOpacity, cardTranslate]);
 
   return (
     <LinearGradient
@@ -28,30 +99,57 @@ export default function WelcomeScreen() {
       style={styles.container}
     >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={styles.content}>
-          <View style={styles.logoStack}>
+          <Animated.View
+            style={[
+              styles.logoStack,
+              {
+                transform: [
+                  { scale: logoScale },
+                  {
+                    rotate: logoRotate.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: ['-6deg', '6deg', '-6deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <View style={styles.primaryLogo}>
               <Ionicons name="water" size={50} color="white" />
             </View>
             <View style={styles.heartBadge}>
               <Ionicons name="heart" size={20} color="#DC2626" />
             </View>
-          </View>
+          </Animated.View>
 
-          <Text style={styles.title}>E-Donor</Text>
+          <Animated.Text
+            style={[
+              styles.title,
+              { opacity: titleOpacity, transform: [{ translateY: titleTranslate }] },
+            ]}
+          >
+            E-Donor
+          </Animated.Text>
           <Text style={styles.subtitle}>
             Connecting hearts, saving lives through digital blood donation
           </Text>
 
-          <View style={styles.featureCard}>
+          <Animated.View
+            style={[
+              styles.featureCard,
+              { opacity: cardOpacity, transform: [{ translateY: cardTranslate }] },
+            ]}
+          >
             {features.map((feature) => (
               <View key={feature} style={styles.featureItem}>
                 <View style={styles.featureBullet} />
                 <Text style={styles.featureText}>{feature}</Text>
               </View>
             ))}
-          </View>
+          </Animated.View>
 
           <TouchableOpacity
             style={styles.ctaButton}

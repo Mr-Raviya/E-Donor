@@ -1,7 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  PanResponder,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Slide = {
@@ -41,16 +51,69 @@ const slides: Slide[] = [
   },
 ];
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const slideTranslate = useRef(new Animated.Value(0)).current;
+  const slideOpacity = useRef(new Animated.Value(1)).current;
 
   const currentSlide = useMemo(() => slides[currentStep], [currentStep]);
   const buttonLabel = currentSlide.buttonLabel ?? 'Continue';
 
   const goToRoleSelection = () => {
-    router.push('/role-selection');
+    router.push('/sign-in');
   };
+
+  const animateStepChange = useCallback(
+    (targetStep: number) => {
+      if (targetStep === currentStep || targetStep < 0 || targetStep >= slides.length) {
+        return;
+      }
+
+      const direction = targetStep > currentStep ? -1 : 1;
+      const outTo = direction * 40;
+
+      slideTranslate.stopAnimation();
+      slideOpacity.stopAnimation();
+
+      Animated.parallel([
+        Animated.timing(slideTranslate, {
+          toValue: outTo,
+          duration: 180,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideOpacity, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setCurrentStep(targetStep);
+        slideTranslate.setValue(-outTo);
+        slideOpacity.setValue(0);
+
+        Animated.parallel([
+          Animated.timing(slideTranslate, {
+            toValue: 0,
+            duration: 220,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideOpacity, {
+            toValue: 1,
+            duration: 220,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    },
+    [currentStep, slideOpacity, slideTranslate]
+  );
 
   const handleSkip = () => {
     goToRoleSelection();
@@ -58,7 +121,7 @@ export default function OnboardingScreen() {
 
   const handleContinue = () => {
     if (currentStep < slides.length - 1) {
-      setCurrentStep((prev) => prev + 1);
+      animateStepChange(currentStep + 1);
     } else {
       goToRoleSelection();
     }
@@ -68,12 +131,39 @@ export default function OnboardingScreen() {
     if (currentStep === 0) {
       router.back();
     } else {
-      setCurrentStep((prev) => prev - 1);
+      animateStepChange(currentStep - 1);
     }
   };
 
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gestureState) =>
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 12,
+        onPanResponderRelease: (_event, gestureState) => {
+          const { dx, vx } = gestureState;
+          if ((dx < -60 || vx < -0.4) && currentStep < slides.length - 1) {
+            animateStepChange(currentStep + 1);
+            return;
+          }
+          if ((dx > 60 || vx > 0.4) && currentStep > 0) {
+            animateStepChange(currentStep - 1);
+          }
+        },
+      }),
+    [animateStepChange, currentStep]
+  );
+
+  const animatedSlideStyle = useMemo(
+    () => ({
+      transform: [{ translateX: slideTranslate }],
+      opacity: slideOpacity,
+    }),
+    [slideOpacity, slideTranslate]
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container} {...panResponder.panHandlers}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <View style={styles.header}>
         <TouchableOpacity
@@ -107,27 +197,31 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.heroSection}>
-        <View
-          style={[
-            styles.iconCircle,
-            { backgroundColor: currentSlide.iconBackground },
-          ]}
-        >
-          <Ionicons name={currentSlide.iconName} size={50} color={currentSlide.iconColor} />
-        </View>
-        <Text style={styles.heroTitle}>{currentSlide.title}</Text>
-        <Text style={styles.heroSubtitle}>{currentSlide.subtitle}</Text>
-      </View>
+      <View style={styles.ctaWrapper}>
+        <Animated.View style={[styles.contentWrapper, animatedSlideStyle]}>
+          <View style={styles.heroSection}>
+            <View
+              style={[
+                styles.iconCircle,
+                { backgroundColor: currentSlide.iconBackground },
+              ]}
+            >
+              <Ionicons name={currentSlide.iconName} size={50} color={currentSlide.iconColor} />
+            </View>
+            <Text style={styles.heroTitle}>{currentSlide.title}</Text>
+            <Text style={styles.heroSubtitle}>{currentSlide.subtitle}</Text>
+          </View>
+        </Animated.View>
 
-      <TouchableOpacity
-        onPress={handleContinue}
-        style={styles.ctaButton}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.ctaText}>{buttonLabel}</Text>
-        <Ionicons name="chevron-forward" size={20} color="white" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleContinue}
+          style={styles.ctaButton}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.ctaText}>{buttonLabel}</Text>
+          <Ionicons name="chevron-forward" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -144,6 +238,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 12,
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 16,
+  },
+  ctaWrapper: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   headerButton: {
     padding: 6,
@@ -166,6 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
   },
   skipText: {
+    marginTop: -2,
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',

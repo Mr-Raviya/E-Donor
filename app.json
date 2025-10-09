@@ -1,22 +1,24 @@
 {
   "expo": {
-    "name": "E-Doner",
-    "slug": "E-Doner",
+    "name": "E-Donor",
+    "slug": "E-Donor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "edoner",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": true, 
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
       "statusBarStyle": "dark",
-      "userInterfaceStyle": "light",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true
-      }
+      },
+      "bundleIdentifier": "com.mrraviya.EDonor"
     },
     "android": {
+      "jsEngine": "hermes",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,11 +35,8 @@
         "visible": false,
         "backgroundColor": "#000000"
       },
-      "softwareKeyboardLayoutMode": "pan"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.mrraviya.EDonor"
     },
     "plugins": [
       "expo-router",
@@ -58,6 +57,23 @@
         {
           "position": "absolute",
           "visibility": "hidden"
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "abiFilters": [
+              "arm64-v8a"
+            ],
+            "enableProguardInReleaseBuilds": true,
+            "hermesEnabled": true,
+            "enableMinifyInReleaseBuilds": true
+          },
+          "ios": {
+            "hermesEnabled": true
+          }
         }
       ]
     ],
