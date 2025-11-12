@@ -12,6 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "statusBarStyle": "dark",
+      "userInterfaceStyle": "light",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true
       },
@@ -46,10 +47,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#DC2626",
-          "dark": {
-            "backgroundColor": "#DC2626"
-          }
+          "backgroundColor": "#DC2626"
         }
       ],
       [

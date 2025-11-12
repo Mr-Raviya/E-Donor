@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
 const sanitizeEmail = (value: string) => value.replace(/[^A-Za-z0-9@.]/g, '');
 const sanitizePassword = (value: string) => value.replace(/\s+/g, '');
 const RESET_MODAL_OFFSCREEN = Dimensions.get('window').height;
@@ -100,7 +100,7 @@ export default function SignInScreen() {
     setSigningIn(true);
     setTimeout(() => {
       setSigningIn(false);
-      // TODO: Integrate with actual authentication flow.
+      router.replace('/home');
     }, 1200);
   };
 
@@ -339,7 +339,7 @@ export default function SignInScreen() {
           </View>
 
           <View style={styles.footerPrompt}>
-            <Text style={styles.promptText}>Didn't have an account?</Text>
+            <Text style={styles.promptText}>No account yet?</Text>
             <TouchableOpacity onPress={() => router.push('/sign-up')} activeOpacity={0.7}>
               <Text style={styles.linkText}> Sign Up</Text>
             </TouchableOpacity>
