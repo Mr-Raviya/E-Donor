@@ -4,27 +4,28 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Easing,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-  type KeyboardEvent,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Easing,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    PanResponder,
+    Platform,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
+    type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAdmin } from './contexts/AdminContext';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
 const sanitizeEmail = (value: string) => value.replace(/[^A-Za-z0-9@.]/g, '');
@@ -33,6 +34,7 @@ const RESET_MODAL_OFFSCREEN = Dimensions.get('window').height;
 
 export default function SignInScreen() {
   const router = useRouter();
+  const { login: adminLogin } = useAdmin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secureEntry, setSecureEntry] = useState(true);
@@ -72,7 +74,7 @@ export default function SignInScreen() {
     });
   };
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     Keyboard.dismiss();
     if (signingIn) {
       return;
@@ -98,6 +100,18 @@ export default function SignInScreen() {
 
     setErrors({});
     setSigningIn(true);
+
+    // Check if admin credentials
+    if (trimmedEmail === 'admin@gmail.com' && trimmedPassword === 'admin') {
+      const adminSuccess = await adminLogin(trimmedEmail, trimmedPassword);
+      setSigningIn(false);
+      if (adminSuccess) {
+        router.replace('/admin-dashboard');
+      }
+      return;
+    }
+
+    // Normal user sign in
     setTimeout(() => {
       setSigningIn(false);
       router.replace('/home');
@@ -575,17 +589,16 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 24,
+    borderRadius: 32,
     backgroundColor: 'white',
-    padding: 24,
+    padding: 28,
     gap: 16,
-    borderWidth: 1,
-    borderColor: '#00000020',
+    borderWidth: 0,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    elevation: 15,
   },
   modalTitle: {
     fontSize: 22,
@@ -607,11 +620,11 @@ const styles = StyleSheet.create({
   modalInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#00000020',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: '#F9FAFB',
     gap: 10,
   },
@@ -641,7 +654,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

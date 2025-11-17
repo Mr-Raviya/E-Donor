@@ -3,13 +3,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
-  Animated,
-  Easing,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Animated,
+    Easing,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

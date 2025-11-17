@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppearance } from './contexts/AppearanceContext';
 
 const mockRequest = {
   bloodType: 'O-',
@@ -41,19 +42,24 @@ const mockRequest = {
 
 export default function RequestDetailScreen() {
   const router = useRouter();
+  const { themeMode } = useAppearance();
+  const isDark = themeMode === 'dark';
   useLocalSearchParams<{ id?: string }>();
   const data = mockRequest;
+  const styles = createStyles(isDark);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#DC2626" />
       <View style={styles.pageBackground}>
         <ScrollView
           style={styles.container}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.heroCard}>
+          <LinearGradient
+            colors={['#DC2626', '#B91C1C']}
+            style={styles.heroCard}
+          >
             <View style={styles.heroHeader}>
               <TouchableOpacity
                 style={styles.heroBack}
@@ -80,7 +86,7 @@ export default function RequestDetailScreen() {
                 <Text style={styles.heroPillText}>{data.urgency}</Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -196,7 +202,17 @@ export default function RequestDetailScreen() {
               Accept
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.chatButton} activeOpacity={0.9}>
+          <TouchableOpacity 
+            style={styles.chatButton} 
+            activeOpacity={0.9}
+            onPress={() => router.push({ 
+              pathname: '/chat', 
+              params: { 
+                facilityName: data.hospital.name,
+                facilityId: data.hospital.name.replace(/\s+/g, '-').toLowerCase()
+              } 
+            })}
+          >
             <Ionicons name="chatbubble-ellipses-outline" size={20} color="#111827" />
             <Text style={styles.chatButtonText} numberOfLines={1}>
               Chat
@@ -208,13 +224,23 @@ export default function RequestDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#DC2626' },
-  pageBackground: { flex: 1, backgroundColor: '#F9FAFB' },
+const createStyles = (isDark: boolean) => {
+  const colors = {
+    primary: '#DC2626',
+    primaryLight: '#FEE2E2',
+    backgroundSecondary: isDark ? '#1F2937' : '#F9FAFB',
+    cardBackground: isDark ? '#374151' : '#FFFFFF',
+    text: isDark ? '#F9FAFB' : '#111827',
+    textSecondary: isDark ? '#D1D5DB' : '#6B7280',
+    border: isDark ? '#4B5563' : '#E5E7EB',
+  };
+  
+  return StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.primary },
+  pageBackground: { flex: 1, backgroundColor: colors.backgroundSecondary },
   container: { flex: 1 },
   contentContainer: { paddingBottom: 120 },
   heroCard: {
-    backgroundColor: '#DC2626',
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 28,
@@ -298,7 +324,7 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: 24,
     marginTop: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 18,
     padding: 20,
     shadowColor: '#0F172A',
@@ -317,14 +343,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardHeaderText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
   },
   infoRow: {
     flexDirection: 'row',
@@ -333,19 +359,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   infoLabel: {
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   infoValue: {
-    color: '#111827',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
-  infoValueEmphasis: { fontSize: 15, color: '#111827', fontWeight: '700' },
-  infoValueAccent: { color: '#DC2626' },
+  infoValueEmphasis: { fontSize: 15, color: colors.text, fontWeight: '700' },
+  infoValueAccent: { color: colors.primary },
   infoDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
     marginVertical: 12,
   },
   outlinedPill: {
@@ -376,17 +402,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   notesBlock: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 14,
     padding: 14,
   },
   notesLabel: {
-    color: '#6B7280',
+    color: colors.textSecondary,
     fontSize: 15,
     marginBottom: 6,
   },
   notesValue: {
-    color: '#374151',
+    color: colors.text,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'justify',
@@ -402,11 +428,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 20,
     paddingTop: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.backgroundSecondary,
   },
   acceptButton: {
     flex: 1,
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.primary,
     borderRadius: 18,
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -428,18 +454,19 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
   },
   chatButtonText: {
-    color: '#111827',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
   },
 });
+};

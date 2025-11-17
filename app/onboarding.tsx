@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   PanResponder,
   StatusBar,
@@ -51,7 +50,6 @@ const slides: Slide[] = [
   },
 ];
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function OnboardingScreen() {
   const router = useRouter();

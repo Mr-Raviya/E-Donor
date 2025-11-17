@@ -3,14 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppearance } from './contexts/AppearanceContext';
+import { useLocalization } from './contexts/LocalizationContext';
+import { useUser } from './contexts/UserContext';
 
 type UrgencyLevel = 'Critical' | 'Urgent' | 'Moderate';
 
@@ -103,63 +106,145 @@ const donations = [
 ] as const;
 
 export default function HomeScreen() {
+  const { t, locale } = useLocalization();
+  const { themeMode } = useAppearance();
+  const { user } = useUser();
+  const isDark = themeMode === 'dark';
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const activeCount = useMemo(() => requests.length, []);
   const router = useRouter();
 
+  const styles = createStyles(isDark, locale);
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#DC2626" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]} edges={['top']}>
+      {/* Compact Header */}
+      <View style={[styles.header, { 
+        backgroundColor: isDark ? '#2a2a2a' : '#fff',
+        borderBottomColor: isDark ? '#3a3a3a' : '#e0e0e0'
+      }]}>
+        <View style={styles.headerContent}>
+          {/* Left: App Name */}
+          <View style={styles.headerLeftSection}>
+            <Text style={styles.appName}>  E-Donor</Text>
+          </View>
+
+          {/* Right: Icons Row */}
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/notifications')}>
+              <View style={styles.notificationDot} />
+              <Ionicons name="notifications" size={20} color={isDark ? '#fff' : '#1a1a1a'} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/chat')}>
+              <Ionicons name="chatbubble-ellipses" size={20} color={isDark ? '#fff' : '#1a1a1a'} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/settingspanel')}>
+              <Ionicons name="settings" size={20} color={isDark ? '#fff' : '#1a1a1a'} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroCard}>
-          <View style={styles.heroHeaderRow}>
-            <TouchableOpacity
-              style={styles.profileRow}
-              activeOpacity={0.8}
-              onPress={() => router.push('/profile')}
+        {/* Profile Card - Apple Inspired Single Line */}
+        <TouchableOpacity
+          style={[styles.profileCardLarge, { marginHorizontal: 20, marginTop: 16, marginBottom: 20 }]}
+          activeOpacity={0.8}
+          onPress={() => router.push('/profile')}
+        >
+          <LinearGradient
+            colors={isDark ? ['#374151', '#1F2937'] : ['#E5E7EB', '#D1D5DB']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.profileCardGradient}
+          >
+            <View style={styles.profileCardContent}>
+              {/* Left: Avatar */}
+              {user.profilePicture ? (
+                <Image
+                  source={{ uri: user.profilePicture }}
+                  style={styles.appleAvatar}
+                />
+              ) : (
+                <LinearGradient
+                  colors={isDark ? ['#6B7280', '#4B5563'] : ['#9CA3AF', '#6B7280']}
+                  style={styles.appleAvatar}
+                >
+                  <Text style={styles.appleAvatarText}>
+                    {user.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </Text>
+                </LinearGradient>
+              )}
+
+              {/* Middle: User Info - Single Line */}
+              <View style={styles.appleProfileInfo}>
+                <Text style={styles.appleProfileName} numberOfLines={1}>{user.name}</Text>
+                <View style={styles.appleProfileMeta}>
+                  <Text style={styles.appleProfileBadge}>Gold Donor</Text>
+                  <View style={styles.appleDivider} />
+                  <Text style={styles.appleProfileLocation} numberOfLines={1}>{user.location}</Text>
+                </View>
+              </View>
+
+              {/* Right: Blood Type */}
+              <View style={styles.appleBloodTypeBox}>
+                <Ionicons name="water" size={14} color="#FFFFFF" />
+                <Text style={styles.appleBloodTypeText}>{user.bloodType}</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Stats Cards */}
+        <View style={[styles.statsContainer, { marginHorizontal: 24, marginBottom: 24 }]}>
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.9}>
+            <LinearGradient
+              colors={isDark ? ['#2a2a2a', '#1f1f1f'] : ['#FEE2E2', '#FECACA']}
+              style={styles.statCardGradient}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>JD</Text>
+              <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : 'rgba(255,255,255,0.9)' }]}>
+                <Ionicons name="heart" size={20} color="#DC2626" />
               </View>
-              <View>
-                <Text style={styles.nameText}>John Donor</Text>
-                <Text style={styles.bloodText}>Blood Type: O+</Text>
+              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>12</Text>
+              <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Total Donations</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.9}>
+            <LinearGradient
+              colors={isDark ? ['#2a2a2a', '#1f1f1f'] : ['#DBEAFE', '#BFDBFE']}
+              style={styles.statCardGradient}
+            >
+              <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(255,255,255,0.9)' }]}>
+                <Ionicons name="people" size={20} color="#2563EB" />
               </View>
-            </TouchableOpacity>
-
-            <View style={styles.iconRow}>
-              <TouchableOpacity style={styles.iconButton} accessibilityLabel="Notifications">
-                <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} accessibilityLabel="Messages">
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} accessibilityLabel="Settings">
-                <Ionicons name="settings-outline" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.statRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Total Donations</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>36</Text>
-              <Text style={styles.statLabel}>Lives Saved</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>Gold</Text>
-              <Text style={styles.statLabel}>Donor Status</Text>
-            </View>
-          </View>
+              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>36</Text>
+              <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Lives Saved</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.9}>
+            <LinearGradient
+              colors={isDark ? ['#2a2a2a', '#1f1f1f'] : ['#FEF3C7', '#FDE68A']}
+              style={styles.statCardGradient}
+            >
+              <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : 'rgba(255,255,255,0.9)' }]}>
+                <Ionicons name="ribbon" size={20} color="#D97706" />
+              </View>
+              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>Gold</Text>
+              <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Donor Status</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
+        {/* Tab Switcher */}
         <View style={styles.tabSwitcher}>
           {tabs.map((tab) => {
             const isActive = tab.key === activeTab;
@@ -170,6 +255,11 @@ export default function HomeScreen() {
                 onPress={() => setActiveTab(tab.key)}
                 activeOpacity={0.9}
               >
+                <Ionicons 
+                  name={tab.key === 'requests' ? 'medical' : 'time'} 
+                  size={18} 
+                  color={isActive ? (isDark ? '#fff' : '#1F2937') : (isDark ? '#666' : '#6B7280')} 
+                />
                 <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                   {tab.label}
                 </Text>
@@ -182,13 +272,12 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Nearby Blood Requests</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Requests close to your current location
-                </Text>
+                <Text style={styles.sectionTitle}>{t('urgentBloodRequests')}</Text>
+                <Text style={styles.sectionSubtitle}>{t('helpSaveLives')}</Text>
               </View>
               <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{activeCount} Active</Text>
+                <View style={styles.pulseDot} />
+                <Text style={styles.activeBadgeText}>{activeCount} {t('activeBadge')}</Text>
               </View>
             </View>
 
@@ -196,63 +285,63 @@ export default function HomeScreen() {
               {requests.map((request) => {
                 const urgency = urgencyTokens[request.urgency];
                 return (
-                  <View key={request.id} style={styles.requestCard}>
-                <LinearGradient
-                  colors={['#F97316', '#DC2626']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.cardAccent}
-                />
-                    <View style={styles.cardTopRow}>
-                      <View style={styles.bloodInfo}>
-                        <View style={styles.bloodIconWrap}>
-                          <Ionicons name="water-outline" size={18} color="#DC2626" />
-                        </View>
-                        <Text style={styles.bloodTypeText}>{request.bloodType}</Text>
-                        <View
-                          style={[
-                            styles.urgencyPill,
-                            { backgroundColor: urgency.background },
-                          ]}
+                  <TouchableOpacity 
+                    key={request.id} 
+                    style={styles.requestCard}
+                    activeOpacity={0.95}
+                    onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
+                  >
+                    <LinearGradient
+                      colors={isDark ? ['#2a2a2a', '#2a2a2a'] : ['#FFFFFF', '#FFFFFF']}
+                      style={styles.requestCardGradient}
+                    >
+                      {/* Blood Type Badge */}
+                      <View style={styles.bloodTypeSection}>
+                        <LinearGradient
+                          colors={['#DC2626', '#B91C1C']}
+                          style={styles.bloodTypeBadge}
                         >
-                          <Text
-                            style={[
-                              styles.urgencyText,
-                              { color: urgency.textColor },
-                            ]}
-                          >
-                            {urgency.label}
-                          </Text>
+                          <Ionicons name="water" size={14} color="#FFFFFF" />
+                          <Text style={styles.bloodTypeTextLarge}>{request.bloodType}</Text>
+                        </LinearGradient>
+                        <View style={styles.requestMeta}>
+                          <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
+                            <View style={[styles.urgencyDot, { backgroundColor: urgency.textColor }]} />
+                            <Text style={[styles.urgencyLabel, { color: urgency.textColor }]}>
+                              {urgency.label}
+                            </Text>
+                          </View>
+                          <Text style={styles.timeAgoText}>{request.timeAgo}</Text>
                         </View>
                       </View>
-                      <View style={styles.unitsBlock}>
-                        <Text style={styles.unitsText}>{request.units} units</Text>
-                        <Text style={styles.timeAgo}>{request.timeAgo}</Text>
+
+                      {/* Request Info */}
+                      <View style={styles.requestInfo}>
+                        <Text style={styles.requestTitleText}>{request.requestTitle}</Text>
+                        <Text style={styles.facilityName}>{request.facility}</Text>
+                        
+                        <View style={styles.requestDetails}>
+                          <View style={styles.detailItem}>
+                            <Ionicons name="location" size={14} color="#DC2626" />
+                            <Text style={styles.detailText}>{request.distance}</Text>
+                          </View>
+                          <View style={styles.detailItem}>
+                            <Ionicons name="medkit" size={14} color="#DC2626" />
+                            <Text style={styles.detailText}>{request.units} units needed</Text>
+                          </View>
+                        </View>
                       </View>
-                    </View>
 
-                    <View style={styles.requestBody}>
-                      <Text style={styles.requestTitle}>{request.requestTitle}</Text>
-                      <Text style={styles.facilityText}>{request.facility}</Text>
-                    </View>
-
-                    <View style={styles.locationRow}>
-                      <Ionicons name="location-outline" size={14} color="#6B7280" />
-                      <Text style={styles.locationText}>
-                        {request.location} • {request.distance}
-                      </Text>
-                    </View>
-
-                    <View style={styles.cardFooter}>
-                      <TouchableOpacity
-                        style={styles.respondButton}
-                        activeOpacity={0.9}
+                      {/* Action Button */}
+                      <TouchableOpacity 
+                        style={styles.respondButtonSmall}
                         onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
                       >
-                        <Text style={styles.respondText}>Respond</Text>
+                        <Text style={styles.respondTextSmall}>{t('respond')}</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
                       </TouchableOpacity>
-                    </View>
-                  </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -261,31 +350,47 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Donation History</Text>
+                <Text style={styles.sectionTitle}>{t('donationHistory')}</Text>
+                <Text style={styles.sectionSubtitle}>Your contribution journey</Text>
               </View>
-              <View style={styles.statusBadge}>
-                <Ionicons name="ribbon-outline" size={18} color="#CA8A04" />
-                <Text style={styles.statusBadgeText}>Gold Donor</Text>
-              </View>
+              <TouchableOpacity style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#DC2626" />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.donationList}>
-              {donations.map((donation) => (
-                <View key={donation.id} style={styles.donationCard}>
-                  <View style={styles.donationLeft}>
-                    <View style={styles.donationIconWrap}>
-                      <Ionicons name="heart" size={18} color="#16A34A" />
-                    </View>
-                    <View>
-                      <Text style={styles.donationFacility}>{donation.facility}</Text>
-                      <Text style={styles.donationCase}>{donation.caseType}</Text>
+              {donations.map((donation, index) => (
+                <TouchableOpacity key={donation.id} style={styles.donationCard} activeOpacity={0.9}>
+                  <View style={styles.donationIconContainer}>
+                    <LinearGradient
+                      colors={['#DCFCE7', '#BBF7D0']}
+                      style={styles.donationIconBg}
+                    >
+                      <Ionicons name="heart" size={22} color="#16A34A" />
+                    </LinearGradient>
+                    <View style={[styles.donationNumber, { backgroundColor: '#16A34A' }]}>
+                      <Text style={styles.donationNumberText}>#{12 - index}</Text>
                     </View>
                   </View>
-                  <View style={styles.donationMeta}>
-                    <Text style={styles.donationUnits}>{donation.units} unit</Text>
-                    <Text style={styles.donationDate}>{donation.date}</Text>
+                  <View style={styles.donationContent}>
+                    <Text style={styles.donationFacility}>{donation.facility}</Text>
+                    <Text style={styles.donationCase}>{donation.caseType}</Text>
+                    <View style={styles.donationFooter}>
+                      <View style={styles.donationMetaItem}>
+                        <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
+                        <Text style={styles.donationDate}>{donation.date}</Text>
+                      </View>
+                      <View style={styles.donationMetaItem}>
+                        <Ionicons name="water" size={12} color="#9CA3AF" />
+                        <Text style={styles.donationUnits}>{donation.units} unit</Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
+                  <View style={styles.successBadge}>
+                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                  </View>
+                </TouchableOpacity>
               ))}
             </View>
           </>
@@ -295,332 +400,626 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
+  const colors = {
+    primary: '#DC2626',
+    primaryLight: '#FEE2E2',
+    backgroundSecondary: isDark ? '#1F2937' : '#F9FAFB',
+    cardBackground: isDark ? '#374151' : '#FFFFFF',
+    text: isDark ? '#F9FAFB' : '#111827',
+    textSecondary: isDark ? '#D1D5DB' : '#6B7280',
+    border: isDark ? '#4B5563' : '#E5E7EB',
+  };
+  // Reduce font size by 2 for Sinhala and Tamil
+  const fontReduction = (locale === 'si' || locale === 'ta') ? 4 : 0;
+  const baseFontSize = 14 - fontReduction;
+  
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#DC2626',
+    backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#DC2626',
+  header: {
+    backgroundColor: isDark ? '#2a2a2a' : '#fff',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  contentContainer: {
-    paddingBottom: 32,
-    backgroundColor: '#F9FAFB',
-  },
-  heroCard: {
-    backgroundColor: '#DC2626',
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    paddingBottom: 32,
-    gap: 32,
-  },
-  heroHeaderRow: {
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  profileRow: {
+  headerLeftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  appName: {
+    fontSize: baseFontSize + 10,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.5,
+  },
+  greetingContainer: {
+    flex: 1,
+  },
+  headerGreeting: {
+    fontSize: baseFontSize - 3,
+    marginBottom: 2,
+  },
+  headerUserName: {
+    fontSize: baseFontSize + 4,
+    fontWeight: '700',
+  },
+  profileIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileIconImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  profileIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileIconText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
+  },
+  contentContainer: {
+    paddingBottom: 32,
+  },
+  profileCardLarge: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  profileCardGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  profileCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  appleAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+  },
+  appleAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  appleProfileInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  appleProfileName: {
+    color: isDark ? '#FFFFFF' : '#1F2937',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginBottom: 4,
+  },
+  appleProfileMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  appleProfileBadge: {
+    color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(31,41,55,0.9)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  appleDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(31,41,55,0.3)',
+  },
+  appleProfileLocation: {
+    color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(31,41,55,0.8)',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  appleBloodTypeBox: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 3,
+    minWidth: 50,
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+  },
+  appleBloodTypeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  profileCard: {
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FCD34D',
+    borderWidth: 2,
+    borderColor: isDark ? '#2a2a2a' : '#fff',
+  },
+  profileLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 14,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FB7185',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  nameText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  bloodText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  iconRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: baseFontSize + 6,
     fontWeight: '700',
   },
+  bloodBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  bloodBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    color: '#FFFFFF',
+    fontSize: baseFontSize + 2,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(252, 211, 77, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#FCD34D',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 4,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  statCardGradient: {
+    padding: 12,
+    alignItems: 'center',
+    minHeight: 120,
+    justifyContent: 'center',
+  },
+  statIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
   statLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-    marginTop: 6,
+    fontSize: 9,
     textAlign: 'center',
+    fontWeight: '700',
+    lineHeight: 11,
+    flexWrap: 'wrap',
+    maxWidth: '100%',
   },
   tabSwitcher: {
     flexDirection: 'row',
-    marginHorizontal: 24,
-    marginTop: -24,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 999,
-    padding: 6,
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 6,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: isDark ? '#1a1a1a' : '#E5E7EB',
+    borderRadius: 16,
+    padding: 3,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 999,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
   },
   tabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    elevation: 3,
+    backgroundColor: isDark ? '#2a2a2a' : '#FFFFFF',
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
+    elevation: 4,
   },
   tabLabel: {
-    color: '#6B7280',
-    fontSize: 15,
-    fontWeight: '500',
+    color: isDark ? '#666' : '#6B7280',
+    fontSize: baseFontSize,
+    fontWeight: '600',
   },
   tabLabelActive: {
-    color: '#111827',
+    color: isDark ? '#fff' : '#1F2937',
+    fontWeight: '700',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 26,
     paddingHorizontal: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: baseFontSize + 6,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
+    fontSize: baseFontSize - 2,
+    color: colors.textSecondary,
   },
   activeBadge: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : '#FEE2E2',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: 20,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   activeBadgeText: {
-    color: '#DC2626',
-    fontSize: 13,
+    color: colors.primary,
+    fontSize: baseFontSize - 2,
+    fontWeight: '700',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllText: {
+    color: colors.primary,
+    fontSize: baseFontSize - 1,
     fontWeight: '600',
   },
   requestList: {
-    marginTop: 16,
     paddingHorizontal: 24,
     gap: 12,
   },
   requestCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    padding: 16,
-    position: 'relative',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 12 },
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
     shadowRadius: 16,
-    elevation: 6,
+    elevation: 5,
+    marginBottom: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+  },
+  requestCardGradient: {
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
   },
-  cardAccent: {
-    position: 'absolute',
-    left: 0,
-    top: 10,
-    bottom: 10,
-    width: 6,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-  },
-  cardTopRow: {
+  bloodTypeSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingLeft: 4,
+    marginBottom: 12,
   },
-  bloodInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  bloodIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bloodTypeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  urgencyPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  urgencyText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  unitsBlock: {
-    alignItems: 'flex-end',
-  },
-  unitsText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  timeAgo: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  requestBody: {
-    marginTop: 10,
-    paddingLeft: 4,
-  },
-  requestTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  facilityText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  locationRow: {
+  bloodTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
-    paddingLeft: 4,
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#4B5563',
-  },
-  cardFooter: {
-    alignItems: 'flex-end',
-    marginTop: 12,
-  },
-  respondButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 999,
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-  },
-  respondText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  donationList: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    gap: 14,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusBadgeText: {
-    color: '#B45309',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  donationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 12,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
     elevation: 4,
   },
-  donationLeft: {
+  bloodTypeTextLarge: {
+    color: '#FFFFFF',
+    fontSize: baseFontSize + 6,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  requestMeta: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  urgencyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  urgencyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  urgencyLabel: {
+    fontSize: baseFontSize - 2,
+    fontWeight: '700',
+  },
+  timeAgoText: {
+    fontSize: baseFontSize - 3,
+    color: isDark ? '#999' : '#6B7280',
+  },
+  requestInfo: {
+    marginBottom: 12,
+  },
+  requestTitleText: {
+    fontSize: baseFontSize + 1,
+    fontWeight: '700',
+    color: isDark ? '#ffffff' : '#1F2937',
+    marginBottom: 3,
+  },
+  facilityName: {
+    fontSize: baseFontSize - 1,
+    color: isDark ? '#aaa' : '#6B7280',
+    marginBottom: 8,
+  },
+  requestDetails: {
+    flexDirection: 'row',
     gap: 12,
   },
-  donationIconWrap: {
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailText: {
+    fontSize: baseFontSize - 1,
+    color: isDark ? '#ccc' : '#374151',
+    fontWeight: '600',
+  },
+  respondButtonSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  respondTextSmall: {
+    color: '#FFFFFF',
+    fontSize: baseFontSize,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  donationList: {
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  donationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  donationIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  donationIconBg: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#16A34A',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  donationNumber: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.cardBackground,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  donationNumberText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  donationContent: {
+    flex: 1,
+  },
+  donationFacility: {
+    fontSize: baseFontSize + 2,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  donationCase: {
+    fontSize: baseFontSize,
+    color: colors.textSecondary,
+    marginBottom: 10,
+  },
+  donationFooter: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  donationMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  donationDate: {
+    fontSize: baseFontSize - 2,
+    color: colors.textSecondary,
+  },
+  donationUnits: {
+    fontSize: baseFontSize - 2,
+    color: colors.textSecondary,
+  },
+  successBadge: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  donationFacility: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  donationCase: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  donationMeta: {
-    alignItems: 'flex-end',
-  },
-  donationUnits: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  donationDate: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
+    borderWidth: 2,
+    borderColor: '#BBF7D0',
   },
 });
+};

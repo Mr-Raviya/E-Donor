@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "edoner",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true, 
+    "newArchEnabled": true,
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
@@ -78,6 +78,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "position": "absolute",
+        "visibility": "hidden"
+      },
+      "eas": {
+        "projectId": "0f4e42d6-d031-4043-826a-59af581bcf34"
+      }
     }
   }
 }

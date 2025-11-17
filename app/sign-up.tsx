@@ -162,9 +162,16 @@ export default function SignUpScreen() {
         string
       >
       > = {};
-      const fieldsToClear: Array<
-        'firstName' | 'lastName' | 'email' | 'city' | 'phone' | 'bloodType' | 'birthday' | 'password'
-      > = [];
+      const fieldsToClear: (
+        | 'firstName'
+        | 'lastName'
+        | 'email'
+        | 'city'
+        | 'phone'
+        | 'bloodType'
+        | 'birthday'
+        | 'password'
+      )[] = [];
 
       const trimmedFirstName = firstName.trim();
       const trimmedLastName = lastName.trim();
@@ -406,7 +413,7 @@ export default function SignUpScreen() {
         try {
           const errorBody = (await response.json()) as { error?: string; message?: string };
           errorMessage = errorBody.error || errorBody.message || errorMessage;
-        } catch (parseError) {
+        } catch {
           // Ignore parse errors and use the default message
         }
         throw new Error(errorMessage);
