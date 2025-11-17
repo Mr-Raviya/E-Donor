@@ -499,12 +499,12 @@ const createStyles = (isDark: boolean) => {
     },
     headerTitle: {
       color: colors.text,
-      fontSize: baseFontSize + 4,
+      fontSize: baseFontSize + 2,
       fontWeight: '600',
     },
     saveText: {
       color: colors.primary,
-      fontSize: baseFontSize,
+      fontSize: baseFontSize - 2,
       fontWeight: '600',
     },
     scrollView: {
@@ -530,7 +530,7 @@ const createStyles = (isDark: boolean) => {
       justifyContent: 'center',
     },
     avatarText: {
-      fontSize: baseFontSize + 16,
+      fontSize: baseFontSize + 14,
       fontWeight: '700',
       letterSpacing: 1,
     },
@@ -565,7 +565,7 @@ const createStyles = (isDark: boolean) => {
       borderBottomColor: colors.border,
     },
     sectionTitle: {
-      fontSize: baseFontSize + 2,
+      fontSize: baseFontSize,
       fontWeight: '600',
       color: colors.text,
     },
@@ -573,7 +573,7 @@ const createStyles = (isDark: boolean) => {
       marginBottom: 20,
     },
     inputLabel: {
-      fontSize: baseFontSize,
+      fontSize: baseFontSize - 2,
       fontWeight: '700',
       color: colors.text,
       marginBottom: 10,
@@ -594,7 +594,7 @@ const createStyles = (isDark: boolean) => {
     },
     input: {
       flex: 1,
-      fontSize: baseFontSize + 1,
+      fontSize: baseFontSize - 1,
       color: colors.text,
       paddingVertical: 14,
       fontWeight: '500',
@@ -626,7 +626,7 @@ const createStyles = (isDark: boolean) => {
       borderColor: colors.primary,
     },
     bloodTypeText: {
-      fontSize: baseFontSize + 1,
+      fontSize: baseFontSize - 1,
       fontWeight: '700',
       color: colors.text,
       letterSpacing: 0.5,
@@ -647,7 +647,7 @@ const createStyles = (isDark: boolean) => {
     },
     saveButtonLabel: {
       color: '#FFFFFF',
-      fontSize: baseFontSize + 2,
+      fontSize: baseFontSize,
       fontWeight: '600',
     },
     modalOverlay: {
@@ -683,15 +683,15 @@ const createStyles = (isDark: boolean) => {
       zIndex: 1,
     },
     modalTitle: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: '700',
       color: '#111827',
       textAlign: 'center',
       marginBottom: 8,
     },
     modalMessage: {
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: 13,
+      lineHeight: 20,
       color: '#6B7280',
       textAlign: 'center',
       marginBottom: 24,
@@ -731,12 +731,12 @@ const createStyles = (isDark: boolean) => {
       width: '100%',
     },
     modalCancelText: {
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: '600',
       color: '#111827',
     },
     modalPrimaryText: {
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: '700',
       color: 'white',
     },
