@@ -3,11 +3,6 @@
     "version": ">= 10.0.0"
   },
   "build": {
-    "production": {
-      "android": {
-        "buildType": "apk"
-      }
-    },
     "apk64": {
       "android": {
         "buildType": "apk"
