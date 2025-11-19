@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Image,
     KeyboardAvoidingView,
     Modal,
@@ -68,6 +69,11 @@ export default function EditProfileScreen() {
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+  const containsEmoji = (text: string) => {
+    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F270}\u{238C}-\u{2454}\u{20D0}-\u{20FF}\u{FE00}-\u{FE0F}]/u;
+    return emojiRegex.test(text);
+  };
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -104,6 +110,9 @@ export default function EditProfileScreen() {
     setIsSaving(true);
 
     try {
+      // Simulate loading delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Update user in context and AsyncStorage
       await updateUser({
         name: name.trim(),
@@ -230,7 +239,11 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(text) => {
+                    if (!containsEmoji(text)) {
+                      setName(text);
+                    }
+                  }}
                   placeholder={t('enterFullName')}
                   placeholderTextColor={colors.textSecondary}
                   autoCapitalize="words"
@@ -246,7 +259,11 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(text) => {
+                    if (!containsEmoji(text)) {
+                      setEmail(text);
+                    }
+                  }}
                   placeholder={t('enterEmail')}
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="email-address"
@@ -263,7 +280,11 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(text) => {
+                    if (!containsEmoji(text)) {
+                      setPhone(text);
+                    }
+                  }}
                   placeholder={t('enterPhone')}
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="phone-pad"
@@ -279,7 +300,11 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={location}
-                  onChangeText={setLocation}
+                  onChangeText={(text) => {
+                    if (!containsEmoji(text)) {
+                      setLocation(text);
+                    }
+                  }}
                   placeholder={t('enterLocation')}
                   placeholderTextColor={colors.textSecondary}
                 />
@@ -331,7 +356,11 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={medicalNotes}
-                  onChangeText={setMedicalNotes}
+                  onChangeText={(text) => {
+                    if (!containsEmoji(text)) {
+                      setMedicalNotes(text);
+                    }
+                  }}
                   placeholder={t('enterMedicalNotes')}
                   placeholderTextColor={colors.textSecondary}
                   multiline
@@ -349,9 +378,13 @@ export default function EditProfileScreen() {
             disabled={isSaving}
             activeOpacity={0.7}
           >
-            <Text style={styles.saveButtonLabel}>
-              {isSaving ? t('saving') : t('saveChanges')}
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonLabel}>
+                {t('saveChanges')}
+              </Text>
+            )}
           </TouchableOpacity>
 
           <View style={{ height: 40 }} />
@@ -363,10 +396,24 @@ export default function EditProfileScreen() {
         animationType="fade"
         transparent
         visible={successModalVisible}
-        onRequestClose={() => setSuccessModalVisible(false)}
+        onRequestClose={() => {
+          setSuccessModalVisible(false);
+          router.back();
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setSuccessModalVisible(false);
+            router.back();
+          }}
+        >
+          <TouchableOpacity 
+            style={styles.modalCard}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => {
@@ -380,18 +427,8 @@ export default function EditProfileScreen() {
             <Ionicons name="checkmark-circle" size={48} color="#10B981" style={{ marginBottom: 16 }} />
             <Text style={styles.modalTitle}>{t('success')}</Text>
             <Text style={styles.modalMessage}>{t('profileUpdated')}</Text>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalSuccessButton]}
-              onPress={() => {
-                setSuccessModalVisible(false);
-                router.back();
-              }}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.modalPrimaryText}>{t('ok')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Error Modal */}
@@ -490,6 +527,8 @@ const createStyles = (isDark: boolean) => {
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: 'rgba(220, 20, 60, 0.1)',
+      borderRadius: 20,
     },
     saveButton: {
       paddingHorizontal: 12,

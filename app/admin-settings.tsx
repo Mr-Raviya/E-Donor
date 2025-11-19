@@ -291,7 +291,7 @@ export default function AdminSettings() {
             </View>
             <View style={[styles.infoItem, { borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#f0f0f0' }]}>
               <Text style={[styles.infoLabel, { color: themeMode === 'dark' ? '#999' : '#666' }]}>Build</Text>
-              <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>2024.11.16</Text>
+              <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>2025.11.06</Text>
             </View>
             <View style={[styles.infoItem, { borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#f0f0f0' }]}>
               <Text style={[styles.infoLabel, { color: themeMode === 'dark' ? '#999' : '#666' }]}>Environment</Text>
@@ -313,7 +313,7 @@ export default function AdminSettings() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: themeMode === 'dark' ? '#999' : '#666' }]}>E-Donor Admin Panel</Text>
-          <Text style={[styles.footerSubtext, { color: themeMode === 'dark' ? '#666' : '#999' }]}>© 2024 All rights reserved</Text>
+          <Text style={[styles.footerSubtext, { color: themeMode === 'dark' ? '#666' : '#999' }]}>© 2025 All rights reserved</Text>
         </View>
       </ScrollView>
 

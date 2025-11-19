@@ -295,7 +295,7 @@ export default function SettingsPanel() {
           <Ionicons name="arrow-back" size={24} color={themeMode === 'dark' ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>{t('title')}</Text>
-        <View style={styles.backButton} />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -304,7 +304,11 @@ export default function SettingsPanel() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <View style={styles.profileSection}>
+        <TouchableOpacity 
+          style={styles.profileSection}
+          onPress={() => router.push('/profile')}
+          activeOpacity={0.8}
+        >
           <LinearGradient
             colors={['#DC143C', '#8B0000']}
             style={styles.profileGradient}
@@ -322,7 +326,7 @@ export default function SettingsPanel() {
             <Text style={styles.userName}>{user.name}</Text>
             <Text style={styles.userEmail}>{user.email}</Text>
           </LinearGradient>
-        </View>
+        </TouchableOpacity>
 
         {/* Appearance Settings */}
         <View style={styles.section}>
@@ -388,7 +392,7 @@ export default function SettingsPanel() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: themeMode === 'dark' ? '#999' : '#666' }]}>E-Donor App</Text>
-          <Text style={[styles.footerSubtext, { color: themeMode === 'dark' ? '#666' : '#999' }]}>© 2024 All rights reserved</Text>
+          <Text style={[styles.footerSubtext, { color: themeMode === 'dark' ? '#666' : '#999' }]}>© 2025 All rights reserved</Text>
         </View>
       </ScrollView>
 
@@ -438,12 +442,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   backButton: {
-    padding: 4,
-    width: 32,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(220, 20, 60, 0.1)',
+    borderRadius: 20,
   },
   title: {
     fontSize: 20,

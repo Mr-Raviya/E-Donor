@@ -180,9 +180,13 @@ export default function AdminDashboard() {
 
           {/* Quick Actions */}
           <View style={styles.quickActionsSection}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>Quick Actions</Text>
             <View style={styles.quickActions}>
-              <TouchableOpacity style={styles.quickActionButton}>
+              <TouchableOpacity 
+                style={styles.quickActionButton}
+                onPress={() => router.push('/admin-users')}
+                activeOpacity={0.8}
+              >
                 <LinearGradient
                   colors={['#DC143C', '#8B0000']}
                   style={styles.quickActionGradient}
@@ -191,7 +195,11 @@ export default function AdminDashboard() {
                   <Text style={styles.quickActionText}>Add User</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionButton}>
+              <TouchableOpacity 
+                style={styles.quickActionButton}
+                onPress={() => router.push('/admin-notifications')}
+                activeOpacity={0.8}
+              >
                 <LinearGradient
                   colors={['#DC143C', '#8B0000']}
                   style={styles.quickActionGradient}

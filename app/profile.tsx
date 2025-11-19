@@ -54,7 +54,7 @@ export default function ProfileScreen() {
           <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: isDark ? '#fff' : '#1a1a1a' }]}>{t('profile')}</Text>
-        <TouchableOpacity style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.push('/chat')} style={styles.backButton}>
           <Ionicons name="chatbubble-ellipses-outline" size={24} color={isDark ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
       </View>
@@ -227,12 +227,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   backButton: {
-    padding: 4,
-    width: 32,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(220, 20, 60, 0.1)',
+    borderRadius: 20,
   },
   title: {
     fontSize: 20,

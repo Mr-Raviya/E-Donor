@@ -29,9 +29,9 @@ interface User {
 const initialUsers: User[] = [
   {
     id: '1',
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 234 567 8900',
+    name: 'Kasun Rajapaksa',
+    email: 'kasun.rajapaksa@example.com',
+    phone: '+94 77 123 4567',
     bloodType: 'A+',
     status: 'active',
     joinedDate: '2024-01-15',
@@ -39,9 +39,9 @@ const initialUsers: User[] = [
   },
   {
     id: '2',
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    phone: '+1 234 567 8901',
+    name: 'Thisara Fernando',
+    email: 'thisara.fernando@example.com',
+    phone: '+94 71 234 5678',
     bloodType: 'O+',
     status: 'active',
     joinedDate: '2024-02-20',
@@ -49,9 +49,9 @@ const initialUsers: User[] = [
   },
   {
     id: '3',
-    name: 'Mike Johnson',
-    email: 'mike.j@example.com',
-    phone: '+1 234 567 8902',
+    name: 'Amali Perera',
+    email: 'amali.perera@example.com',
+    phone: '+94 76 345 6789',
     bloodType: 'B+',
     status: 'inactive',
     joinedDate: '2024-03-10',

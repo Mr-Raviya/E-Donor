@@ -17,7 +17,7 @@ const mockRequest = {
   unitsNeeded: 2,
   urgency: 'Critical Priority',
   patient: {
-    name: 'Sarah Johnson',
+    name: 'Nimal Perera',
     age: '34 years',
     bloodType: 'O-',
     condition: 'Emergency Surgery',
@@ -26,16 +26,16 @@ const mockRequest = {
       'Patient scheduled for emergency surgery following car accident. O- blood type urgently needed for transfusion. Patient is stable but requires immediate intervention.',
   },
   hospital: {
-    name: 'City General Hospital',
+    name: 'National Hospital of Sri Lanka',
     department: 'Emergency Department',
-    location: 'City Hospital, Downtown',
+    location: 'Colombo 10',
     distance: '2.1 km',
-    contactPerson: 'Dr. Michael Chen',
-    contactPhone: '+1 (555) 123-4567',
+    contactPerson: 'Dr. Ajith Fernando',
+    contactPhone: '+94 11 269 1111',
   },
   timeline: {
     requested: '2 hours ago',
-    requestedBy: 'Dr. Michael Chen, Emergency Dept.',
+    requestedBy: 'Dr. Ajith Fernando',
     requiredBy: 'Today, 6:00 PM',
   },
 };

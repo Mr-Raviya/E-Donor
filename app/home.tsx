@@ -43,9 +43,9 @@ const requests: RequestCard[] = [
     id: '1',
     bloodType: 'O-',
     urgency: 'Critical',
-    facility: 'City General Hospital',
+    facility: 'National Hospital of Sri Lanka',
     requestTitle: 'Emergency Surgery',
-    location: 'City Hospital, Downtown',
+    location: 'Colombo 10',
     distance: '2.1 km',
     units: 2,
     timeAgo: '2 hours ago',
@@ -54,9 +54,9 @@ const requests: RequestCard[] = [
     id: '2',
     bloodType: 'A+',
     urgency: 'Urgent',
-    facility: 'Central Medical Center',
+    facility: 'Lanka Hospitals',
     requestTitle: 'Cancer Treatment',
-    location: 'Central Medical Center',
+    location: 'Colombo 05',
     distance: '3.5 km',
     units: 1,
     timeAgo: '4 hours ago',
@@ -65,9 +65,9 @@ const requests: RequestCard[] = [
     id: '3',
     bloodType: 'B+',
     urgency: 'Moderate',
-    facility: 'Community Hospital',
+    facility: 'Asiri Central Hospital',
     requestTitle: 'Accident Victim',
-    location: 'Community Hospital',
+    location: 'Colombo 08',
     distance: '5.2 km',
     units: 3,
     timeAgo: '1 day ago',
@@ -84,21 +84,21 @@ type TabKey = (typeof tabs)[number]['key'];
 const donations = [
   {
     id: 'd1',
-    facility: 'City Hospital',
+    facility: 'Lanka Hospitals',
     caseType: 'Emergency Surgery',
     units: 1,
     date: '2024-08-15',
   },
   {
     id: 'd2',
-    facility: 'Blood Bank Center',
+    facility: 'National Blood Centre',
     caseType: 'Cancer Patient',
     units: 1,
     date: '2024-06-20',
   },
   {
     id: 'd3',
-    facility: 'Community Hospital',
+    facility: 'Nawaloka Hospital',
     caseType: 'Accident Victim',
     units: 1,
     date: '2024-04-10',
@@ -353,7 +353,10 @@ export default function HomeScreen() {
                 <Text style={styles.sectionTitle}>{t('donationHistory')}</Text>
                 <Text style={styles.sectionSubtitle}>Your contribution journey</Text>
               </View>
-              <TouchableOpacity style={styles.viewAllButton}>
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={() => router.push('/donation-history')}
+              >
                 <Text style={styles.viewAllText}>View All</Text>
                 <Ionicons name="chevron-forward" size={16} color="#DC2626" />
               </TouchableOpacity>
@@ -369,9 +372,6 @@ export default function HomeScreen() {
                     >
                       <Ionicons name="heart" size={22} color="#16A34A" />
                     </LinearGradient>
-                    <View style={[styles.donationNumber, { backgroundColor: '#16A34A' }]}>
-                      <Text style={styles.donationNumberText}>#{12 - index}</Text>
-                    </View>
                   </View>
                   <View style={styles.donationContent}>
                     <Text style={styles.donationFacility}>{donation.facility}</Text>
