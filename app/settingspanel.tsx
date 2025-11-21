@@ -4,16 +4,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Image,
-    Linking,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
@@ -291,7 +291,13 @@ export default function SettingsPanel() {
         backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#fff',
         borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#e0e0e0'
       }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={[
+            styles.backButton,
+            { backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+          ]}
+        >
           <Ionicons name="arrow-back" size={24} color={themeMode === 'dark' ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>{t('title')}</Text>
@@ -451,7 +457,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(220, 20, 60, 0.1)',
     borderRadius: 20,
   },
   title: {

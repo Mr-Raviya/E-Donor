@@ -127,6 +127,7 @@ export default function EditProfileScreen() {
       setIsSaving(false);
       setSuccessModalVisible(true);
     } catch (error) {
+      console.error('Failed to update profile:', error);
       setIsSaving(false);
       setErrorMessage('Failed to update profile');
       setErrorModalVisible(true);
@@ -529,12 +530,6 @@ const createStyles = (isDark: boolean) => {
       justifyContent: 'center',
       backgroundColor: 'rgba(220, 20, 60, 0.1)',
       borderRadius: 20,
-    },
-    saveButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     headerTitle: {
       color: colors.text,

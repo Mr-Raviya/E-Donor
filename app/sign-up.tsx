@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Modal,
   Keyboard,
   PanResponder,
   ScrollView,
@@ -21,6 +22,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUser } from './contexts/UserContext';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,12}$/;
@@ -65,6 +67,7 @@ const birthdayPattern = /^\d{2}-\d{2}-\d{4}$/;
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { signUpWithPassword, updateUser } = useUser();
   const insets = useSafeAreaInsets();
   const [secureEntry, setSecureEntry] = useState(true);
   const [firstName, setFirstName] = useState('');
@@ -97,6 +100,7 @@ export default function SignUpScreen() {
     >
   >({});
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
   const createAccountShake = useRef(new Animated.Value(0)).current;
   const nextButtonShake = useRef(new Animated.Value(0)).current;
   const stepsTranslate = useRef(new Animated.Value(0)).current;
@@ -387,39 +391,28 @@ export default function SignUpScreen() {
     const trimmedLastName = lastName.trim();
     const trimmedPhone = phone.replace(/\s+/g, '').trim();
     const trimmedCity = city.trim();
-    const trimmedBirthday = birthday.trim();
 
     setCreatingAccount(true);
     try {
-      const response = await fetch('https://reqres.in/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          password: trimmedPassword,
-          firstName: trimmedFirstName,
-          lastName: trimmedLastName,
+      await signUpWithPassword(
+        trimmedEmail,
+        trimmedPassword,
+        `${trimmedFirstName} ${trimmedLastName}`,
+        {
           phone: trimmedPhone,
-          city: trimmedCity,
-          birthday: trimmedBirthday,
-          bloodType: selectedBloodType,
-        }),
+          location: trimmedCity,
+          bloodType: selectedBloodType ?? '',
+        },
+      );
+      await updateUser({
+        name: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        location: trimmedCity,
+        medicalNotes: '',
+        bloodType: selectedBloodType ?? '',
       });
-
-      if (!response.ok) {
-        let errorMessage = 'We could not create your account. Please try again.';
-        try {
-          const errorBody = (await response.json()) as { error?: string; message?: string };
-          errorMessage = errorBody.error || errorBody.message || errorMessage;
-        } catch {
-          // Ignore parse errors and use the default message
-        }
-        throw new Error(errorMessage);
-      }
-
-      router.replace('/sign-in');
+      setSuccessModalVisible(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error occurred.';
       Alert.alert('Unable to create account', message);
@@ -921,6 +914,31 @@ export default function SignUpScreen() {
           ))}
         </Animated.View>
       </View>
+
+      <Modal
+        visible={successModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuccessModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Ionicons name="checkmark-circle" size={48} color="#22C55E" style={{ marginBottom: 12 }} />
+            <Text style={styles.modalTitle}>Account Created</Text>
+            <Text style={styles.modalMessage}>Sign up was successful. You can log in now.</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.modalPrimary]}
+              activeOpacity={0.9}
+              onPress={() => {
+                setSuccessModalVisible(false);
+                router.replace('/sign-in');
+              }}
+            >
+              <Text style={styles.primaryText}>Go to Sign In</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -973,6 +991,42 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 16,
     paddingHorizontal: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 350,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalPrimary: {
+    width: '100%',
+    borderRadius: 14,
   },
   formCard: {
     backgroundColor: 'white',

@@ -65,7 +65,6 @@ export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Add user form state
   const [newUser, setNewUser] = useState({

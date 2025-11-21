@@ -9,20 +9,29 @@ This document provides instructions for setting up and using the E-Donor admin p
 
 ## Installation
 
-1. Install the dependencies:
-```bash
-npm install
-```
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Provide Firebase credentials in `.env` (see root `README.md` for the exact variables).
+3. Start Expo:
+   ```bash
+   npx expo start
+   ```
 
-Or with yarn:
-```bash
-yarn install
-```
+> ℹ️ The admin UI still uses mocked data locally. When you are ready to persist admin actions, connect each module to Firestore or Cloud Functions using the Firebase helpers in `lib/firebase.ts`.
 
-2. Start the development server:
-```bash
-npm start
-```
+## Backend Integration Checklist
+
+| Module              | Suggested Firebase Collection |
+|---------------------|--------------------------------|
+| User Management     | `profiles`, `admins`           |
+| Hospital Management | `hospitals`                    |
+| Inventory           | `blood_inventory`              |
+| Requests            | `donation_requests`            |
+| Notifications       | `notifications` + Cloud Functions |
+
+Create collections with similar field names (snake_case) so the current mock data maps easily once you replace the in-memory arrays.
 
 ## Admin Panel Features
 
@@ -116,13 +125,10 @@ From the dashboard, you can access any module by tapping its card:
 ## Security Notes
 
 ⚠️ **Important for Production:**
-- The current implementation uses hardcoded credentials for demonstration
-- In production, implement proper backend authentication
-- Use secure token-based authentication (JWT)
-- Store credentials securely in environment variables
-- Implement rate limiting and brute force protection
-- Add two-factor authentication
-- Use HTTPS for all API calls
+- The admin credentials are hardcoded for demos; wire them to Firebase Auth or a custom auth service before releasing.
+- Lock Firestore with rules that restrict each collection to the correct roles (e.g., only admins can mutate `donation_requests`).
+- Store secrets in `.env` or a secrets manager (never in source control).
+- Add rate limiting, two-factor auth, and HTTPS for every API call.
 
 ## Customization
 

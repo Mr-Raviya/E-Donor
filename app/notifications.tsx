@@ -3,11 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
@@ -463,47 +463,6 @@ const createStyles = (isDark: boolean) => {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 12,
-    },
-    iconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    contentContainer: {
-      flex: 1,
-    },
-    contentHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 4,
-      gap: 8,
-    },
-    notificationTitle: {
-      fontSize: baseFontSize,
-      fontWeight: '700',
-      color: isDark ? '#fff' : '#1F2937',
-      flex: 1,
-    },
-    notificationBody: {
-      fontSize: baseFontSize - 1,
-      color: isDark ? '#aaa' : '#6B7280',
-      lineHeight: 18,
-      marginBottom: 6,
-    },
-    timeText: {
-      fontSize: baseFontSize - 2,
-      color: isDark ? '#666' : '#9CA3AF',
-    },
-    unreadDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: '#DC2626',
-    },
-    deleteBtn: {
-      padding: 4,
     },
     notificationUnread: {
       shadowOpacity: 0.12,

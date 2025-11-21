@@ -3,9 +3,14 @@
 ## 📥 Installation
 
 ```bash
-cd "E-Donor"
+cd E-Donor
 npm install
-npm start
+```
+
+Update `.env` with your Firebase credentials (see root README) and then:
+
+```bash
+npx expo start
 ```
 
 ## 🔑 Admin Login
@@ -54,9 +59,9 @@ npm start
 - Manage notification types
 
 ### ⚙️ Settings
-- Configure notifications
-- System settings
-- Data management
+- Configure notifications and toggles
+- System switches (auto approve, 2FA, maintenance)
+- Data management actions
 - Logout
 
 ## 🎨 Design Features
@@ -77,12 +82,10 @@ npm start
 
 ## 🛠️ Tech Stack
 
-- React Native
-- Expo Router
-- TypeScript
-- AsyncStorage
-- Linear Gradient
-- Ionicons
+- Expo + React Native + TypeScript
+- Firebase Auth + Cloud Firestore (profiles)
+- AsyncStorage (local cache only)
+- Expo Router, LinearGradient, Ionicons
 
 ## ⚡ Quick Commands
 

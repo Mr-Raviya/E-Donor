@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Animated,
     Dimensions,
     Easing,
@@ -26,6 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAdmin } from './contexts/AdminContext';
+import { useUser } from './contexts/UserContext';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
 const sanitizeEmail = (value: string) => value.replace(/[^A-Za-z0-9@.]/g, '');
@@ -35,6 +37,7 @@ const RESET_MODAL_OFFSCREEN = Dimensions.get('window').height;
 export default function SignInScreen() {
   const router = useRouter();
   const { login: adminLogin } = useAdmin();
+  const { signInWithPassword } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secureEntry, setSecureEntry] = useState(true);
@@ -111,11 +114,15 @@ export default function SignInScreen() {
       return;
     }
 
-    // Normal user sign in
-    setTimeout(() => {
+    try {
+      await signInWithPassword(trimmedEmail, trimmedPassword);
       setSigningIn(false);
       router.replace('/home');
-    }, 1200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to sign in. Please try again.';
+      setSigningIn(false);
+      Alert.alert('Sign In Failed', message);
+    }
   };
 
   const handleResetLink = () => {

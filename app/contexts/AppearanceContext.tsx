@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
+import { Appearance } from 'react-native';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -14,20 +14,10 @@ interface AppearanceContextType {
 const AppearanceContext = createContext<AppearanceContextType | undefined>(undefined);
 
 export function AppearanceProvider({ children }: { children: React.ReactNode }) {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
-  const [fontSize, setFontSizeState] = useState(15);
-  const [systemColorScheme, setSystemColorScheme] = useState<ColorSchemeName>(
-    Appearance.getColorScheme()
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(
+    Appearance.getColorScheme() === 'dark' ? 'dark' : 'light'
   );
-
-  // Listen to system theme changes
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setSystemColorScheme(colorScheme);
-    });
-
-    return () => subscription.remove();
-  }, []);
+  const [fontSize, setFontSizeState] = useState(15);
 
   // Log when theme or font size changes
   useEffect(() => {

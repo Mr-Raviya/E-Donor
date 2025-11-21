@@ -198,6 +198,12 @@ The E-Donor Admin Panel features a modern, professional design with:
 
 ---
 
+## 🔗 Data & Backend Notes
+
+- The live app authenticates administrators through Firebase Auth (see `UserContext`).
+- Admin modules currently show mock data; connect each module to Firestore collections (`profiles`, `hospitals`, `donation_requests`, etc.) when backend endpoints are ready.
+- Follow the security guidance in `ADMIN_PANEL_README.md` to restrict Firestore access to admins only.
+
 ## 🎯 Key Design Patterns
 
 ### Color System

@@ -2,6 +2,18 @@
 
 ## ✅ What Has Been Created
 
+All features described below currently read/write in-memory data on the device. Firebase Auth + Firestore are already set up for donor profiles; wire these admin modules to real collections or Cloud Functions when your backend schema is ready.
+
+**Suggested mapping**
+
+| Module                | Collection / Service           |
+|-----------------------|--------------------------------|
+| User Management       | `profiles`                     |
+| Hospital Management   | `hospitals`                    |
+| Blood Inventory       | `blood_inventory`              |
+| Blood Requests        | `donation_requests`            |
+| Notifications         | `notifications` + Cloud Functions |
+
 ### 🔐 Authentication System
 **Files Created:**
 - `app/contexts/AdminContext.tsx` - Admin authentication context

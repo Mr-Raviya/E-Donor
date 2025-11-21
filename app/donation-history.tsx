@@ -128,7 +128,7 @@ export default function DonationHistoryScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: isDark ? '#fff' : '#1a1a1a' }]}>Donation History</Text>
+        <Text style={[styles.title, { color: isDark ? '#fff' : '#1a1a1a' }]}>{t('donationHistory')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -140,7 +140,7 @@ export default function DonationHistoryScreen() {
         >
           <Ionicons name="water" size={24} color="#DC2626" />
           <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>12</Text>
-          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Total Donations</Text>
+          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>{t('totalDonations')}</Text>
         </LinearGradient>
         <LinearGradient
           colors={isDark ? ['#2a2a2a', '#1f1f1f'] : ['#DBEAFE', '#BFDBFE']}
@@ -148,7 +148,7 @@ export default function DonationHistoryScreen() {
         >
           <Ionicons name="people" size={24} color="#2563EB" />
           <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>36</Text>
-          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Lives Saved</Text>
+          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>{t('livesSaved')}</Text>
         </LinearGradient>
         <LinearGradient
           colors={isDark ? ['#2a2a2a', '#1f1f1f'] : ['#FEF3C7', '#FDE68A']}
@@ -156,7 +156,7 @@ export default function DonationHistoryScreen() {
         >
           <Ionicons name="medal" size={24} color="#D97706" />
           <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>Gold</Text>
-          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Status</Text>
+          <Text style={[styles.statLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>{t('donorStatus')}</Text>
         </LinearGradient>
       </View>
 

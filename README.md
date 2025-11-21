@@ -1,50 +1,98 @@
-# Welcome to your Expo app 👋
+# E-Donor
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+E-Donor is a cross-platform Expo application that helps donors and administrators coordinate blood donations, manage requests, and stay informed through a modern mobile experience.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Public experience**: donor onboarding, profile management, notifications, and donation history.
+- **Admin experience**: manage donors, hospitals, inventory, requests, and outbound notifications.
+- **Firebase backend**: authentication powered by Firebase Auth and profile data persisted with Cloud Firestore.
+- **Expo Router + TypeScript**: file-based routing with a strongly typed UI layer.
 
-   ```bash
-   npm install
+## Requirements
+
+- Node.js 18+
+- Expo CLI (`npm install -g expo-cli`)
+- A Firebase project with Authentication and Firestore enabled
+
+## Firebase Setup
+
+1. Create a Firebase project and register iOS, Android, and Web apps (web registration exposes the config snippet).
+2. Enable **Email/Password** in Firebase Authentication.
+3. Create a **Firestore Database** (production or test mode).
+4. Add the following security rule so each user controls their own profile:
+   ```txt
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{db}/documents {
+       match /profiles/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+     }
+   }
+   ```
+5. Copy your Firebase config into `.env` (or use `app.json.extra.firebase`):
+   ```env
+   EXPO_PUBLIC_FIREBASE_API_KEY=...
+   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+   EXPO_PUBLIC_FIREBASE_APP_ID=...
    ```
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Installation
 
 ```bash
-npm run reset-project
+git clone <repo>
+cd E-Donor
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Development
 
-## Learn more
+```bash
+npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Use the QR code with Expo Go or launch the iOS/Android simulators directly from the CLI menu.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+To clear caches:
 
-## Join the community
+```bash
+npx expo start --clear
+```
 
-Join our community of developers creating universal apps.
+## Admin Access
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Launch the app and tap **Admin Portal**.
+- Use demo credentials `admin@gmail.com / admin`.
+- The admin interface is a local-only mock; hook it to Firestore/Cloud Functions when you are ready for production.
+
+## Project Structure
+
+- `app/` – screens and layouts (Expo Router).
+- `app/contexts/` – shared React contexts (appearance, localization, user/auth).
+- `app/services/` – Firestore-facing helpers.
+- `components/` – reusable UI elements.
+- `lib/` – Firebase client configuration.
+- `assets/` – static images, icons, and fonts.
+
+## Documentation
+
+| File                        | Description                                   |
+|-----------------------------|-----------------------------------------------|
+| `ADMIN_PANEL_README.md`     | Admin-specific setup & feature overview       |
+| `ADMIN_DESIGN_GUIDE.md`     | Visual reference for the admin experience     |
+| `ADMIN_IMPLEMENTATION_SUMMARY.md` | Inventory of admin modules & screens    |
+| `QUICK_START.md`            | Fast reference for developers/admin testers   |
+
+## Contributing
+
+1. Branch from `main`.
+2. Run `npm run lint` before pushing.
+3. Include screenshots or screen recordings when modifying UI.
+
+## License
+
+Internal project – contact the project maintainer before sharing externally.

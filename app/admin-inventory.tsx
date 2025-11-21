@@ -23,8 +23,6 @@ interface BloodStock {
   lastUpdated: string;
 }
 
-const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
 const initialInventory: BloodStock[] = [
   {
     bloodType: 'A+',
