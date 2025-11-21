@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     Dimensions,
     Easing,
@@ -36,7 +35,7 @@ const RESET_MODAL_OFFSCREEN = Dimensions.get('window').height;
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { login: adminLogin } = useAdmin();
+  const { refreshAdminStatus } = useAdmin();
   const { signInWithPassword } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,6 +49,8 @@ export default function SignInScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [resetError, setResetError] = useState<string | undefined>(undefined);
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const signInShake = useRef(new Animated.Value(0)).current;
   const resetShake = useRef(new Animated.Value(0)).current;
   const resetModalTranslate = useRef(new Animated.Value(RESET_MODAL_OFFSCREEN)).current;
@@ -102,26 +103,18 @@ export default function SignInScreen() {
     }
 
     setErrors({});
+    setErrorModalVisible(false);
     setSigningIn(true);
-
-    // Check if admin credentials
-    if (trimmedEmail === 'admin@gmail.com' && trimmedPassword === 'admin') {
-      const adminSuccess = await adminLogin(trimmedEmail, trimmedPassword);
-      setSigningIn(false);
-      if (adminSuccess) {
-        router.replace('/admin-dashboard');
-      }
-      return;
-    }
 
     try {
       await signInWithPassword(trimmedEmail, trimmedPassword);
+      const isAdmin = await refreshAdminStatus();
       setSigningIn(false);
-      router.replace('/home');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sign in. Please try again.';
+      router.replace(isAdmin ? '/admin-dashboard' : '/home');
+    } catch {
       setSigningIn(false);
-      Alert.alert('Sign In Failed', message);
+      setErrorMessage('Email or password is incorrect. Please try again.');
+      setErrorModalVisible(true);
     }
   };
 
@@ -370,6 +363,28 @@ export default function SignInScreen() {
         <Modal
           animationType="fade"
           transparent
+          visible={errorModalVisible}
+          onRequestClose={() => setErrorModalVisible(false)}
+        >
+          <View style={styles.authErrorOverlay}>
+            <View style={styles.authErrorCard}>
+              <Ionicons name="alert-circle" size={40} color="#DC2626" style={{ marginBottom: 12 }} />
+              <Text style={styles.authErrorTitle}>Authentication Failed</Text>
+              <Text style={styles.authErrorMessage}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.authErrorButton}
+                onPress={() => setErrorModalVisible(false)}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.authErrorButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          animationType="fade"
+          transparent
           visible={forgotVisible}
           onRequestClose={closeForgotModal}
         >
@@ -484,6 +499,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     marginTop: 4,
+  },
+  authErrorOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    padding: 24,
+  },
+  authErrorCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  authErrorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  authErrorMessage: {
+    fontSize: 14,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  authErrorButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 999,
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  authErrorButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.3,
   },
   formCard: {
     backgroundColor: 'white',

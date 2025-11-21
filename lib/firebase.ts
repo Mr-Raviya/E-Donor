@@ -1,7 +1,9 @@
 import Constants from 'expo-constants';
 import { FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const extra = Constants.expoConfig?.extra ?? Constants.manifest?.extra ?? {};
 const firebaseExtra = (extra as Record<string, any>).firebase ?? {};
@@ -20,7 +22,15 @@ if (!firebaseConfig.apiKey) {
   console.warn('Firebase config missing. Set EXPO_PUBLIC_FIREBASE_* env vars or app.json extra.firebase.');
 }
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const hasInitializedApp = getApps().length > 0;
+const app = hasInitializedApp ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+const isWeb = Platform.OS === 'web';
+export const auth = !isWeb
+  ? hasInitializedApp
+    ? getAuth(app)
+    : initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      })
+  : getAuth(app);
 export const db = getFirestore(app);

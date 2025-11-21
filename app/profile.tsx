@@ -17,12 +17,12 @@ import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
 
-const getBasicInfo = (t: (key: string) => string, user: any) => [
+const getBasicInfo = (t: (key: string) => string, user: any, memberSince: string) => [
   { icon: 'mail-outline' as const, label: t('emailLabel'), value: user.email },
   { icon: 'call-outline' as const, label: t('phoneLabel'), value: user.phone },
   { icon: 'location-outline' as const, label: t('locationLabel'), value: user.location },
   { icon: 'water-outline' as const, label: t('bloodTypeLabel'), value: user.bloodType },
-  { icon: 'calendar-outline' as const, label: t('memberSince'), value: 'January 2023' },
+  { icon: 'calendar-outline' as const, label: t('memberSince'), value: memberSince },
 ];
 
 const getAdditionalDetails = (t: (key: string) => string, user: any) => [
@@ -30,18 +30,30 @@ const getAdditionalDetails = (t: (key: string) => string, user: any) => [
   { label: t('lastDonation'), value: 'July 15, 2024' },
   { label: t('donorStatus'), value: t('goldDonor') },
   { label: t('nextEligible'), value: 'October 20, 2024' },
-  { label: t('medicalNotesLabel'), value: user.medicalNotes || 'No restrictions' },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { t } = useLocalization();
   const { themeMode } = useAppearance();
-  const { user } = useUser();
+  const { user, session } = useUser();
   const isDark = themeMode === 'dark';
   const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
+
+  const memberSince = React.useMemo(() => {
+    const creation = session?.metadata?.creationTime;
+    if (!creation) {
+      return 'N/A';
+    }
+    const date = new Date(creation);
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date);
+  }, [session?.metadata?.creationTime]);
   
-  const basicInfo = getBasicInfo(t, user);
+  const basicInfo = getBasicInfo(t, user, memberSince);
   const additionalDetails = getAdditionalDetails(t, user);
 
   return (

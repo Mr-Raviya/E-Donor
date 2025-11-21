@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Dimensions,
     Modal,
@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
+import { listUserProfiles } from './services/profileService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -25,7 +26,7 @@ interface DashboardCard {
   icon: keyof typeof Ionicons.glyphMap;
   color: readonly [string, string];
   route: string;
-  count?: number;
+  count?: number | string;
 }
 
 const dashboardCards: DashboardCard[] = [
@@ -35,7 +36,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'people',
     color: ['#4F46E5', '#3730A3'],
     route: '/admin-users',
-    count: 1247,
+    count: '--',
   },
   {
     id: '2',
@@ -83,7 +84,45 @@ export default function AdminDashboard() {
   const { admin, logout } = useAdmin();
   const { themeMode } = useAppearance();
   const isDark = themeMode === 'dark';
-  const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [userStats, setUserStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+  });
+  const [userStatsLoading, setUserStatsLoading] = useState(true);
+
+  const refreshUserStats = useCallback(async () => {
+    try {
+      setUserStatsLoading(true);
+      const profiles = await listUserProfiles();
+      const active = profiles.filter((profile) => profile.status !== 'inactive').length;
+      const inactive = profiles.length - active;
+      setUserStats({
+        total: profiles.length,
+        active,
+        inactive,
+      });
+    } catch (error) {
+      console.error('Failed to load user stats:', error);
+    } finally {
+      setUserStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUserStats();
+  }, [refreshUserStats]);
+
+  const managementCards = useMemo(
+    () =>
+      dashboardCards.map((card) =>
+        card.id === '1'
+          ? { ...card, count: userStatsLoading ? '--' : userStats.total }
+          : card,
+      ),
+    [userStats.total, userStatsLoading],
+  );
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -126,7 +165,9 @@ export default function AdminDashboard() {
             <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <Ionicons name="people" size={24} color="#4F46E5" />
               <View style={styles.statInfo}>
-                <Text style={[styles.statValue, { color: textColor }]}>1,247</Text>
+                <Text style={[styles.statValue, { color: textColor }]}>
+                  {userStatsLoading ? '--' : userStats.total.toLocaleString()}
+                </Text>
                 <Text style={[styles.statLabel, { color: subtextColor }]}>Total Users</Text>
               </View>
             </View>
@@ -147,7 +188,7 @@ export default function AdminDashboard() {
         >
           <Text style={[styles.sectionTitle, { color: textColor }]}>Management Modules</Text>
           <View style={styles.cardsGrid}>
-            {dashboardCards.map((card) => (
+            {managementCards.map((card) => (
               <TouchableOpacity
                 key={card.id}
                 style={styles.card}

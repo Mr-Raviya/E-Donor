@@ -10,6 +10,7 @@ import {
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import { fetchUserProfile, upsertUserProfile } from '../services/profileService';
+import { fetchAdminRecord } from '../services/adminService';
 import { UserProfile } from '../types/user';
 
 const USER_STORAGE_KEY = '@e_donor_user';
@@ -49,6 +50,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile>(defaultUser);
   const [session, setSession] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdminAccount, setIsAdminAccount] = useState(false);
 
   const cacheUserLocally = useCallback(async (profile: UserProfile) => {
     try {
@@ -72,6 +74,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const syncProfileWithBackend = useCallback(
     async (userId: string, fallback?: Partial<UserProfile>) => {
       try {
+        const adminRecord = await fetchAdminRecord(userId);
+        if (adminRecord) {
+          setIsAdminAccount(true);
+          return;
+        }
+        setIsAdminAccount(false);
+
         const remoteProfile = await fetchUserProfile(userId);
 
         if (remoteProfile) {
@@ -126,13 +135,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [loadUserFromCache, syncProfileWithBackend]);
 
   const refreshProfile = useCallback(async () => {
-    if (session?.uid) {
+    if (session?.uid && !isAdminAccount) {
       await syncProfileWithBackend(session.uid);
     }
-  }, [session?.uid, syncProfileWithBackend]);
+  }, [isAdminAccount, session?.uid, syncProfileWithBackend]);
 
   const updateUser = useCallback(
     async (updates: Partial<UserProfile>) => {
+      if (isAdminAccount) {
+        return;
+      }
       try {
         const updatedUser = { ...user, ...updates };
         setUser(updatedUser);
@@ -151,9 +163,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfilePicture = useCallback(
     async (uri: string) => {
+      if (isAdminAccount) {
+        return;
+      }
       await updateUser({ profilePicture: uri });
     },
-    [updateUser],
+    [isAdminAccount, updateUser],
   );
 
   const signInWithPassword = useCallback(

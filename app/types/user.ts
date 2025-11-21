@@ -9,4 +9,7 @@ export interface UserProfile {
   profilePicture?: string;
   donorLevel?: string;
   lastDonationDate?: string;
+  status?: 'active' | 'inactive';
+  joinedDate?: string;
+  donationCount?: number;
 }

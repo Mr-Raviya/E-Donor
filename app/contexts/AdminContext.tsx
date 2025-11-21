@@ -1,76 +1,101 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  User,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import { AdminRecord, fetchAdminRecord } from '../services/adminService';
 
-interface Admin {
-  email: string;
-  name: string;
+interface AdminSession {
+  uid: string;
+  email?: string;
+  name?: string;
+  role?: string;
 }
 
 interface AdminContextType {
-  admin: Admin | null;
+  admin: AdminSession | null;
   isAdminAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  refreshAdminStatus: () => Promise<boolean>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
-// Admin credentials (in production, this should be in a secure backend)
-const ADMIN_EMAIL = 'admin@gmail.com';
-const ADMIN_PASSWORD = 'admin';
-const ADMIN_STORAGE_KEY = '@admin_session';
+const buildAdminSession = (user: User, record: AdminRecord | null): AdminSession | null => {
+  if (!record) {
+    return null;
+  }
+
+  return {
+    uid: user.uid,
+    email: user.email ?? record.email,
+    name: record.name ?? user.displayName ?? user.email ?? 'Admin',
+    role: record.role ?? 'admin',
+  };
+};
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const [admin, setAdmin] = useState<Admin | null>(null);
+  const [admin, setAdmin] = useState<AdminSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    checkAdminSession();
+  const resolveAdminForUser = useCallback(async (user: User | null): Promise<AdminSession | null> => {
+    if (!user?.uid) {
+      setAdmin(null);
+      return null;
+    }
+    try {
+      const record = await fetchAdminRecord(user.uid);
+      const adminSession = record ? buildAdminSession(user, record) : null;
+      setAdmin(adminSession);
+      return adminSession;
+    } catch (error) {
+      console.error('Failed to fetch admin record:', error);
+      setAdmin(null);
+      return null;
+    }
   }, []);
 
-  const checkAdminSession = async () => {
-    try {
-      const session = await AsyncStorage.getItem(ADMIN_STORAGE_KEY);
-      if (session) {
-        const adminData = JSON.parse(session);
-        setAdmin(adminData);
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
-    } finally {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      await resolveAdminForUser(firebaseUser);
       setIsLoading(false);
-    }
-  };
+    });
+    return () => unsubscribe();
+  }, [resolveAdminForUser]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
-      // Validate credentials
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        const adminData: Admin = {
-          email: ADMIN_EMAIL,
-          name: 'Admin',
-        };
-        
-        await AsyncStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(adminData));
-        setAdmin(adminData);
-        return true;
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const adminSession = await resolveAdminForUser(credential.user);
+      if (!adminSession) {
+        await firebaseSignOut(auth);
+        return false;
       }
-      return false;
+      return true;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Admin login error:', error);
       return false;
     }
-  };
+  }, [resolveAdminForUser]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
-      await AsyncStorage.removeItem(ADMIN_STORAGE_KEY);
+      await firebaseSignOut(auth);
       setAdmin(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
+  }, []);
+
+  const refreshAdminStatus = useCallback(async (): Promise<boolean> => {
+    const adminSession = await resolveAdminForUser(auth.currentUser);
+    return !!adminSession;
+  }, [resolveAdminForUser]);
 
   return (
     <AdminContext.Provider
@@ -80,6 +105,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         isLoading,
+        refreshAdminStatus,
       }}
     >
       {children}

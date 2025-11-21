@@ -89,12 +89,12 @@
         "projectId": "0f4e42d6-d031-4043-826a-59af581bcf34"
       },
       "firebase": {
-        "apiKey": "",
-        "authDomain": "",
-        "projectId": "",
-        "storageBucket": "",
-        "messagingSenderId": "",
-        "appId": ""
+        "apiKey": "AIzaSyD7mFH0jX9SoxH1JCzXfWu9daPBjzTSBdU",
+        "authDomain": "e-donor-2025.firebaseapp.com",
+        "projectId": "e-donor-2025",
+        "storageBucket": "e-donor-2025.firebasestorage.app",
+        "messagingSenderId": "326352899654",
+        "appId": "1:326352899654:web:6aa651d308c8a06e1e8447"
       }
     }
   }

@@ -1,18 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  createAdminUserProfile,
+  deleteAdminUserProfile,
+  listUserProfiles,
+  updateAdminUserProfile,
+} from './services/profileService';
+import { UserProfile } from './types/user';
 
 interface User {
   id: string;
@@ -25,46 +34,27 @@ interface User {
   donationCount: number;
 }
 
-// Mock data
-const initialUsers: User[] = [
-  {
-    id: '1',
-    name: 'Kasun Rajapaksa',
-    email: 'kasun.rajapaksa@example.com',
-    phone: '+94 77 123 4567',
-    bloodType: 'A+',
-    status: 'active',
-    joinedDate: '2024-01-15',
-    donationCount: 5,
-  },
-  {
-    id: '2',
-    name: 'Thisara Fernando',
-    email: 'thisara.fernando@example.com',
-    phone: '+94 71 234 5678',
-    bloodType: 'O+',
-    status: 'active',
-    joinedDate: '2024-02-20',
-    donationCount: 3,
-  },
-  {
-    id: '3',
-    name: 'Amali Perera',
-    email: 'amali.perera@example.com',
-    phone: '+94 76 345 6789',
-    bloodType: 'B+',
-    status: 'inactive',
-    joinedDate: '2024-03-10',
-    donationCount: 1,
-  },
-];
+const normalizeProfileToUser = (profile: UserProfile): User => ({
+  id: profile.id ?? '',
+  name: profile.name || 'Unnamed user',
+  email: profile.email || 'N/A',
+  phone: profile.phone || 'N/A',
+  bloodType: profile.bloodType || 'N/A',
+  status: profile.status === 'inactive' ? 'inactive' : 'active',
+  joinedDate: profile.joinedDate?.split('T')[0] ?? 'Unknown',
+  donationCount: profile.donationCount ?? 0,
+});
 
 export default function AdminUsers() {
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pendingActionUserId, setPendingActionUserId] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   // Add user form state
   const [newUser, setNewUser] = useState({
@@ -73,6 +63,31 @@ export default function AdminUsers() {
     phone: '',
     bloodType: 'A+',
   });
+
+  const normalizeAndSetUsers = useCallback((profiles: UserProfile[]) => {
+    setUsers(
+      profiles
+        .map((profile) => normalizeProfileToUser(profile))
+        .filter((user) => Boolean(user.id)),
+    );
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const remoteUsers = await listUserProfiles();
+      normalizeAndSetUsers(remoteUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      Alert.alert('Error', 'Unable to load users. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [normalizeAndSetUsers]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -83,34 +98,53 @@ export default function AdminUsers() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleAddUser = () => {
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadUsers();
+  }, [loadUsers]);
+
+  const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.phone) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    const user: User = {
-      id: Date.now().toString(),
-      ...newUser,
-      status: 'active',
-      joinedDate: new Date().toISOString().split('T')[0],
-      donationCount: 0,
-    };
-
-    setUsers([...users, user]);
-    setShowAddModal(false);
-    setNewUser({ name: '', email: '', phone: '', bloodType: 'A+' });
-    Alert.alert('Success', 'User added successfully');
+    try {
+      setCreatingUser(true);
+      const createdUser = await createAdminUserProfile({
+        name: newUser.name.trim(),
+        email: newUser.email.trim(),
+        phone: newUser.phone.trim(),
+        bloodType: newUser.bloodType,
+      });
+      setUsers((prev) => [...prev, normalizeProfileToUser(createdUser)]);
+      setShowAddModal(false);
+      setNewUser({ name: '', email: '', phone: '', bloodType: 'A+' });
+      Alert.alert('Success', 'User added successfully');
+    } catch (error) {
+      console.error('Failed to add user:', error);
+      Alert.alert('Error', 'Unable to add user. Please try again.');
+    } finally {
+      setCreatingUser(false);
+    }
   };
 
-  const handleToggleStatus = (userId: string) => {
-    setUsers(
-      users.map((user) =>
-        user.id === userId
-          ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-          : user
-      )
-    );
+  const handleToggleStatus = async (user: User) => {
+    const nextStatus = user.status === 'active' ? 'inactive' : 'active';
+    try {
+      setPendingActionUserId(user.id);
+      const updatedUser = await updateAdminUserProfile(user.id, { status: nextStatus });
+      setUsers((prev) =>
+        prev.map((existingUser) =>
+          existingUser.id === user.id ? normalizeProfileToUser(updatedUser) : existingUser,
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to update user status:', error);
+      Alert.alert('Error', 'Unable to update user status. Please try again.');
+    } finally {
+      setPendingActionUserId(null);
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -122,9 +156,18 @@ export default function AdminUsers() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setUsers(users.filter((user) => user.id !== userId));
-            Alert.alert('Success', 'User deleted successfully');
+          onPress: async () => {
+            try {
+              setPendingActionUserId(userId);
+              await deleteAdminUserProfile(userId);
+              setUsers((prev) => prev.filter((user) => user.id !== userId));
+              Alert.alert('Success', 'User deleted successfully');
+            } catch (error) {
+              console.error('Failed to delete user:', error);
+              Alert.alert('Error', 'Unable to delete user. Please try again.');
+            } finally {
+              setPendingActionUserId(null);
+            }
           },
         },
       ]
@@ -165,8 +208,12 @@ export default function AdminUsers() {
 
       <View style={styles.userActions}>
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleToggleStatus(item.id)}
+          style={[
+            styles.actionButton,
+            pendingActionUserId === item.id && styles.disabledButton,
+          ]}
+          onPress={() => handleToggleStatus(item)}
+          disabled={pendingActionUserId === item.id}
         >
           <Ionicons
             name={item.status === 'active' ? 'pause-circle' : 'play-circle'}
@@ -178,8 +225,13 @@ export default function AdminUsers() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
+          style={[
+            styles.actionButton,
+            styles.deleteButton,
+            pendingActionUserId === item.id && styles.disabledButton,
+          ]}
           onPress={() => handleDeleteUser(item.id)}
+          disabled={pendingActionUserId === item.id}
         >
           <Ionicons name="trash" size={20} color="#DC2626" />
           <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
@@ -245,13 +297,35 @@ export default function AdminUsers() {
       </View>
 
       {/* Users List */}
-      <FlatList
-        data={filteredUsers}
-        renderItem={renderUser}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC143C" />
+          <Text style={styles.loadingText}>Loading users...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          renderItem={renderUser}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.listContent,
+            filteredUsers.length === 0 && styles.emptyListContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#DC143C" />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="people-circle" size={48} color="#999" />
+              <Text style={styles.emptyStateTitle}>No users found</Text>
+              <Text style={styles.emptyStateText}>
+                Try adjusting your search or add a new user.
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Add User Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
@@ -325,9 +399,17 @@ export default function AdminUsers() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleAddUser}>
+            <TouchableOpacity
+              style={[styles.submitButton, creatingUser && styles.submitButtonDisabled]}
+              onPress={handleAddUser}
+              disabled={creatingUser}
+            >
               <LinearGradient colors={['#DC143C', '#8B0000']} style={styles.submitGradient}>
-                <Text style={styles.submitText}>Add User</Text>
+                {creatingUser ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitText}>Add User</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -431,6 +513,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   userCard: {
     backgroundColor: '#fff',
@@ -542,6 +629,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
     gap: 6,
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   deleteButton: {
     backgroundColor: '#FEE2E2',
   },
@@ -630,13 +720,46 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
   submitGradient: {
     padding: 16,
     alignItems: 'center',
+    borderRadius: 12,
   },
   submitText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyStateTitle: {
+    marginTop: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  emptyStateText: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });

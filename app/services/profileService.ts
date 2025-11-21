@@ -1,8 +1,19 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { UserProfile } from '../types/user';
 
 const COLLECTION = 'profiles';
+const profilesCollection = collection(db, COLLECTION);
 
 const mapSnapshotToProfile = (userId: string, data: Record<string, any>): UserProfile => ({
   id: userId,
@@ -15,7 +26,29 @@ const mapSnapshotToProfile = (userId: string, data: Record<string, any>): UserPr
   profilePicture: data.profile_picture ?? undefined,
   donorLevel: data.donor_level ?? undefined,
   lastDonationDate: data.last_donation_date ?? undefined,
+  status: data.status ?? 'active',
+  joinedDate: data.joined_date ?? data.created_at ?? undefined,
+  donationCount: data.donation_count ?? 0,
 });
+
+const serializeProfile = (profile: Partial<UserProfile>): Record<string, any> => {
+  const payload: Record<string, any> = {};
+
+  if (profile.name !== undefined) payload.full_name = profile.name;
+  if (profile.email !== undefined) payload.email = profile.email;
+  if (profile.phone !== undefined) payload.phone = profile.phone;
+  if (profile.location !== undefined) payload.location = profile.location;
+  if (profile.bloodType !== undefined) payload.blood_type = profile.bloodType;
+  if (profile.medicalNotes !== undefined) payload.medical_notes = profile.medicalNotes;
+  if (profile.profilePicture !== undefined) payload.profile_picture = profile.profilePicture;
+  if (profile.donorLevel !== undefined) payload.donor_level = profile.donorLevel;
+  if (profile.lastDonationDate !== undefined) payload.last_donation_date = profile.lastDonationDate;
+  if (profile.status !== undefined) payload.status = profile.status;
+  if (profile.joinedDate !== undefined) payload.joined_date = profile.joinedDate;
+  if (profile.donationCount !== undefined) payload.donation_count = profile.donationCount;
+
+  return payload;
+};
 
 export const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
   const snapshot = await getDoc(doc(db, COLLECTION, userId));
@@ -25,24 +58,64 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
   return mapSnapshotToProfile(userId, snapshot.data());
 };
 
+export const listUserProfiles = async (): Promise<UserProfile[]> => {
+  const snapshot = await getDocs(query(profilesCollection));
+  return snapshot.docs.map((docSnapshot) => mapSnapshotToProfile(docSnapshot.id, docSnapshot.data()));
+};
+
 export const upsertUserProfile = async (
   userId: string,
   profile: Partial<UserProfile>,
 ): Promise<UserProfile> => {
   const payload = {
-    full_name: profile.name ?? null,
-    email: profile.email ?? null,
-    phone: profile.phone ?? null,
-    location: profile.location ?? null,
-    blood_type: profile.bloodType ?? null,
-    medical_notes: profile.medicalNotes ?? null,
-    profile_picture: profile.profilePicture ?? null,
-    donor_level: profile.donorLevel ?? null,
-    last_donation_date: profile.lastDonationDate ?? null,
+    ...serializeProfile(profile),
     updated_at: new Date().toISOString(),
   };
-
   await setDoc(doc(db, COLLECTION, userId), payload, { merge: true });
   const snapshot = await getDoc(doc(db, COLLECTION, userId));
   return mapSnapshotToProfile(userId, snapshot.data() ?? {});
+};
+
+interface CreateAdminUserInput {
+  name: string;
+  email: string;
+  phone: string;
+  bloodType: string;
+}
+
+export const createAdminUserProfile = async (
+  profile: CreateAdminUserInput & Partial<UserProfile>,
+): Promise<UserProfile> => {
+  const now = new Date().toISOString();
+  const payload = {
+    ...serializeProfile({
+      ...profile,
+      status: profile.status ?? 'active',
+      donationCount: profile.donationCount ?? 0,
+      joinedDate: profile.joinedDate ?? now,
+    }),
+    created_at: now,
+    updated_at: now,
+  };
+
+  const docRef = await addDoc(profilesCollection, payload);
+  const snapshot = await getDoc(docRef);
+  return mapSnapshotToProfile(docRef.id, snapshot.data() ?? {});
+};
+
+export const updateAdminUserProfile = async (
+  userId: string,
+  updates: Partial<UserProfile>,
+): Promise<UserProfile> => {
+  const payload = {
+    ...serializeProfile(updates),
+    updated_at: new Date().toISOString(),
+  };
+  await updateDoc(doc(db, COLLECTION, userId), payload);
+  const snapshot = await getDoc(doc(db, COLLECTION, userId));
+  return mapSnapshotToProfile(userId, snapshot.data() ?? {});
+};
+
+export const deleteAdminUserProfile = async (userId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTION, userId));
 };

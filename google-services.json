@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "868062050216",
-    "project_id": "e-donor-76188",
-    "storage_bucket": "e-donor-76188.firebasestorage.app"
+    "project_number": "326352899654",
+    "project_id": "e-donor-2025",
+    "storage_bucket": "e-donor-2025.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:868062050216:android:befc04cde25785eaa24f9d",
+        "mobilesdk_app_id": "1:326352899654:android:b535e187caef6b551e8447",
         "android_client_info": {
           "package_name": "com.mrraviya.EDonor"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBmpHhVuOKPIcY1K3T9V4qT1NF-ZufFwZc"
+          "current_key": "AIzaSyBUm_nrXd2f0Oflw11M3rVH9N9_pKXq2Go"
         }
       ],
       "services": {

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAdmin } from './contexts/AdminContext';
 
 export default function AdminLoginScreen() {
+  const router = useRouter();
   const { login } = useAdmin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +35,7 @@ export default function AdminLoginScreen() {
     setIsLoading(false);
 
     if (success) {
-      // Navigation will be handled automatically by the layout
+      router.replace('/admin-dashboard');
     } else {
       Alert.alert('Login Failed', 'Invalid email or password');
     }
