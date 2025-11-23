@@ -1,25 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  Easing,
-  Modal,
-  Keyboard,
-  PanResponder,
-  ScrollView,
-  StatusBar,
-  StyleProp,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ViewStyle,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    Easing,
+    Keyboard,
+    Modal,
+    PanResponder,
+    ScrollView,
+    StatusBar,
+    StyleProp,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from './contexts/UserContext';
@@ -391,27 +391,37 @@ export default function SignUpScreen() {
     const trimmedLastName = lastName.trim();
     const trimmedPhone = phone.replace(/\s+/g, '').trim();
     const trimmedCity = city.trim();
+    const trimmedBirthday = birthday.trim();
+    const fullName = `${trimmedFirstName} ${trimmedLastName}`.trim();
 
     setCreatingAccount(true);
     try {
+      // Sign up with complete profile information
       await signUpWithPassword(
         trimmedEmail,
         trimmedPassword,
-        `${trimmedFirstName} ${trimmedLastName}`,
+        fullName,
         {
+          name: fullName,
+          email: trimmedEmail,
           phone: trimmedPhone,
           location: trimmedCity,
-          bloodType: selectedBloodType ?? '',
+          bloodType: selectedBloodType ?? 'O+',
+          medicalNotes: '',
+          // Add any other fields you want to save
         },
       );
+      
+      // Update user profile with all details
       await updateUser({
-        name: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+        name: fullName,
         email: trimmedEmail,
         phone: trimmedPhone,
         location: trimmedCity,
         medicalNotes: '',
-        bloodType: selectedBloodType ?? '',
+        bloodType: selectedBloodType ?? 'O+',
       });
+      
       setSuccessModalVisible(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error occurred.';

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Alert,
     FlatList,
@@ -11,9 +11,12 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { sendNotification, listenToAdminNotifications } from './services/notificationService';
+import { auth } from '../lib/firebase';
 
 interface Notification {
   id: string;
@@ -81,9 +84,11 @@ const initialNotifications: Notification[] = [
 
 export default function AdminNotifications() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<typeof notificationTemplates[0] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const [newNotification, setNewNotification] = useState({
     title: '',
@@ -92,30 +97,62 @@ export default function AdminNotifications() {
     targetAudience: 'all' as Notification['targetAudience'],
   });
 
-  const handleSendNotification = () => {
+  // Real-time listener for notifications
+  useEffect(() => {
+    setLoading(true);
+    
+    const unsubscribe = listenToAdminNotifications(
+      (updatedNotifications) => {
+        setNotifications(updatedNotifications);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error listening to notifications:', error);
+        Alert.alert('Error', 'Failed to load notifications');
+        setLoading(false);
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, []);
+
+  const handleSendNotification = async () => {
     if (!newNotification.title || !newNotification.message) {
       Alert.alert('Error', 'Please fill in title and message');
       return;
     }
 
-    const notification: Notification = {
-      id: Date.now().toString(),
-      ...newNotification,
-      sentDate: new Date().toISOString().split('T')[0],
-      sentBy: 'Admin',
-      readCount: 0,
-      totalSent: 1247, // Mock value
-    };
+    setSending(true);
 
-    setNotifications([notification, ...notifications]);
-    setShowSendModal(false);
-    setNewNotification({
-      title: '',
-      message: '',
-      type: 'general',
-      targetAudience: 'all',
-    });
-    Alert.alert('Success', 'Notification sent successfully');
+    try {
+      const currentUser = auth.currentUser;
+      const sentBy = currentUser?.displayName || currentUser?.email || 'Admin';
+
+      await sendNotification({
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+        targetAudience: newNotification.targetAudience,
+        sentBy: sentBy,
+      });
+
+      setShowSendModal(false);
+      setNewNotification({
+        title: '',
+        message: '',
+        type: 'general',
+        targetAudience: 'all',
+      });
+      setSelectedTemplate(null);
+      
+      Alert.alert('Success', 'Notification sent successfully to users!');
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      Alert.alert('Error', 'Failed to send notification. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const getTypeColor = (type: Notification['type']) => {
@@ -198,16 +235,30 @@ export default function AdminNotifications() {
       </View>
 
       {/* Notifications List */}
-      <FlatList
-        data={notifications}
-        renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <Text style={styles.sectionTitle}>Notification History</Text>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC143C" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          renderItem={renderNotification}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <Text style={styles.sectionTitle}>Notification History</Text>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-off" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No notifications sent yet</Text>
+              <Text style={styles.emptySubtext}>Send your first notification to users</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Send Notification Modal */}
       <Modal visible={showSendModal} animationType="slide" transparent>
@@ -339,10 +390,23 @@ export default function AdminNotifications() {
               </View>
 
               {/* Send Button */}
-              <TouchableOpacity style={styles.sendButton} onPress={handleSendNotification}>
+              <TouchableOpacity 
+                style={[styles.sendButton, sending && styles.sendButtonDisabled]} 
+                onPress={handleSendNotification}
+                disabled={sending}
+              >
                 <LinearGradient colors={['#DC143C', '#8B0000']} style={styles.sendGradient}>
-                  <Ionicons name="send" size={20} color="#fff" />
-                  <Text style={styles.sendButtonText}>Send Notification</Text>
+                  {sending ? (
+                    <>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={styles.sendButtonText}>Sending...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={20} color="#fff" />
+                      <Text style={styles.sendButtonText}>Send Notification</Text>
+                    </>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
@@ -618,6 +682,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 20,
   },
+  sendButtonDisabled: {
+    opacity: 0.6,
+  },
   sendGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -629,5 +696,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
   },
 });

@@ -21,11 +21,20 @@ export const fetchAdminRecord = async (userId: string): Promise<AdminRecord | nu
   if (!userId) {
     return null;
   }
-  const snapshot = await getDoc(doc(db, ADMIN_COLLECTION, userId));
-  if (!snapshot.exists()) {
-    return null;
+  try {
+    const snapshot = await getDoc(doc(db, ADMIN_COLLECTION, userId));
+    if (!snapshot.exists()) {
+      return null;
+    }
+    return mapSnapshotToAdmin(userId, snapshot.data());
+  } catch (error: any) {
+    // If permission denied, user is not an admin - return null silently
+    if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+      return null;
+    }
+    // For other errors, throw them
+    throw error;
   }
-  return mapSnapshotToAdmin(userId, snapshot.data());
 };
 
 export const isAdminUser = async (userId: string): Promise<boolean> => {

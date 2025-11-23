@@ -1,10 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  User,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
+    User,
+    signOut as firebaseSignOut,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
 } from 'firebase/auth';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import { AdminRecord, fetchAdminRecord } from '../services/adminService';
 
@@ -53,8 +53,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       const adminSession = record ? buildAdminSession(user, record) : null;
       setAdmin(adminSession);
       return adminSession;
-    } catch (error) {
-      console.error('Failed to fetch admin record:', error);
+    } catch (error: any) {
+      // Silently handle permission errors for normal users
+      // Only log other types of errors
+      if (!error.code?.includes('permission') && !error.message?.includes('permission')) {
+        console.error('Failed to fetch admin record:', error);
+      }
       setAdmin(null);
       return null;
     }

@@ -11,6 +11,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useUnreadNotifications } from '../hooks/use-unread-notifications';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
@@ -113,6 +114,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const activeCount = useMemo(() => requests.length, []);
   const router = useRouter();
+  const unreadCount = useUnreadNotifications();
 
   const styles = createStyles(isDark, locale);
 
@@ -132,8 +134,14 @@ export default function HomeScreen() {
           {/* Right: Icons Row */}
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/notifications')}>
-              <View style={styles.notificationDot} />
               <Ionicons name="notifications" size={20} color={isDark ? '#fff' : '#1a1a1a'} />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/chat')}>
               <Ionicons name="chatbubble-ellipses" size={20} color={isDark ? '#fff' : '#1a1a1a'} />
@@ -603,6 +611,26 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
     backgroundColor: '#FCD34D',
     borderWidth: 2,
     borderColor: isDark ? '#2a2a2a' : '#fff',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: isDark ? '#2a2a2a' : '#fff',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
   },
   profileLeft: {
     flexDirection: 'row',

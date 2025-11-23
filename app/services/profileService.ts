@@ -1,13 +1,13 @@
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    setDoc,
+    updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { UserProfile } from '../types/user';
@@ -67,13 +67,45 @@ export const upsertUserProfile = async (
   userId: string,
   profile: Partial<UserProfile>,
 ): Promise<UserProfile> => {
+  console.log('💾 Upserting profile for user:', userId);
+  console.log('📋 Profile data:', profile);
+  
   const payload = {
     ...serializeProfile(profile),
     updated_at: new Date().toISOString(),
   };
+  
+  console.log('📦 Serialized payload:', payload);
+  
+  // Update profiles collection (existing functionality)
   await setDoc(doc(db, COLLECTION, userId), payload, { merge: true });
+  console.log('✅ Saved to profiles collection');
+  
+  // Also create/update in users collection for notifications
+  try {
+    const userData = {
+      email: profile.email || '',
+      name: profile.name || '',
+      role: 'donor', // Default role for new users
+      bloodType: profile.bloodType || 'O+',
+      location: profile.location || '',
+      phone: profile.phone || '',
+      isActive: true,
+      createdAt: new Date(),
+    };
+    
+    console.log('📧 Saving to users collection:', userData);
+    await setDoc(doc(db, 'users', userId), userData, { merge: true });
+    console.log('✅ Saved to users collection');
+  } catch (error) {
+    console.error('❌ Failed to create user document for notifications:', error);
+    // Don't fail the whole operation if users collection update fails
+  }
+  
   const snapshot = await getDoc(doc(db, COLLECTION, userId));
-  return mapSnapshotToProfile(userId, snapshot.data() ?? {});
+  const savedProfile = mapSnapshotToProfile(userId, snapshot.data() ?? {});
+  console.log('✅ Profile saved successfully:', savedProfile);
+  return savedProfile;
 };
 
 interface CreateAdminUserInput {

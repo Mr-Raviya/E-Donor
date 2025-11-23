@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Dimensions,
     Modal,
@@ -13,9 +13,9 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDashboardStats } from '../hooks/use-dashboard-stats';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
-import { listUserProfiles } from './services/profileService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -36,7 +36,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'people',
     color: ['#4F46E5', '#3730A3'],
     route: '/admin-users',
-    count: '--',
+    count: 0,
   },
   {
     id: '2',
@@ -44,7 +44,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'medical',
     color: ['#059669', '#047857'],
     route: '/admin-hospitals',
-    count: 45,
+    count: 0,
   },
   {
     id: '3',
@@ -52,7 +52,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'water',
     color: ['#DC2626', '#991B1B'],
     route: '/admin-inventory',
-    count: 328,
+    count: 0,
   },
   {
     id: '4',
@@ -60,7 +60,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'medkit',
     color: ['#EA580C', '#C2410C'],
     route: '/admin-requests',
-    count: 89,
+    count: 0,
   },
   {
     id: '5',
@@ -68,7 +68,7 @@ const dashboardCards: DashboardCard[] = [
     icon: 'notifications',
     color: ['#7C3AED', '#5B21B6'],
     route: '/admin-notifications',
-    count: 234,
+    count: 0,
   },
   {
     id: '6',
@@ -85,43 +85,21 @@ export default function AdminDashboard() {
   const { themeMode } = useAppearance();
   const isDark = themeMode === 'dark';
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [userStats, setUserStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-  });
-  const [userStatsLoading, setUserStatsLoading] = useState(true);
+  
+  // Get real-time dashboard statistics
+  const stats = useDashboardStats();
 
-  const refreshUserStats = useCallback(async () => {
-    try {
-      setUserStatsLoading(true);
-      const profiles = await listUserProfiles();
-      const active = profiles.filter((profile) => profile.status !== 'inactive').length;
-      const inactive = profiles.length - active;
-      setUserStats({
-        total: profiles.length,
-        active,
-        inactive,
-      });
-    } catch (error) {
-      console.error('Failed to load user stats:', error);
-    } finally {
-      setUserStatsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshUserStats();
-  }, [refreshUserStats]);
-
+  // Update management cards with live counts
   const managementCards = useMemo(
-    () =>
-      dashboardCards.map((card) =>
-        card.id === '1'
-          ? { ...card, count: userStatsLoading ? '--' : userStats.total }
-          : card,
-      ),
-    [userStats.total, userStatsLoading],
+    () => [
+      { ...dashboardCards[0], count: stats.totalUsers },
+      { ...dashboardCards[1], count: stats.totalHospitals },
+      { ...dashboardCards[2], count: stats.totalInventory },
+      { ...dashboardCards[3], count: stats.totalRequests },
+      { ...dashboardCards[4], count: stats.totalNotifications },
+      dashboardCards[5], // Settings - no count
+    ],
+    [stats],
   );
 
   const handleLogout = () => {
@@ -166,7 +144,7 @@ export default function AdminDashboard() {
               <Ionicons name="people" size={24} color="#4F46E5" />
               <View style={styles.statInfo}>
                 <Text style={[styles.statValue, { color: textColor }]}>
-                  {userStatsLoading ? '--' : userStats.total.toLocaleString()}
+                  {stats.totalUsers.toLocaleString()}
                 </Text>
                 <Text style={[styles.statLabel, { color: subtextColor }]}>Total Users</Text>
               </View>
@@ -174,7 +152,9 @@ export default function AdminDashboard() {
             <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <Ionicons name="trending-up" size={24} color="#059669" />
               <View style={styles.statInfo}>
-                <Text style={[styles.statValue, { color: textColor }]}>89</Text>
+                <Text style={[styles.statValue, { color: textColor }]}>
+                  {stats.activeRequests.toLocaleString()}
+                </Text>
                 <Text style={[styles.statLabel, { color: subtextColor }]}>Active Requests</Text>
               </View>
             </View>

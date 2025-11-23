@@ -111,9 +111,17 @@ export default function SignInScreen() {
       const isAdmin = await refreshAdminStatus();
       setSigningIn(false);
       router.replace(isAdmin ? '/admin-dashboard' : '/home');
-    } catch {
+    } catch (error: any) {
       setSigningIn(false);
-      setErrorMessage('Email or password is incorrect. Please try again.');
+      // Check for specific error messages
+      const errorMsg = error?.message || '';
+      if (errorMsg.includes('deactivated')) {
+        setErrorMessage('Your account has been deactivated. Please contact support for assistance.');
+      } else if (errorMsg.includes('invalid-credential') || errorMsg.includes('wrong-password') || errorMsg.includes('user-not-found')) {
+        setErrorMessage('Email or password is incorrect. Please try again.');
+      } else {
+        setErrorMessage('Unable to sign in. Please check your credentials and try again.');
+      }
       setErrorModalVisible(true);
     }
   };

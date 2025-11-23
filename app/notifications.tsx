@@ -1,19 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth } from '../lib/firebase';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
+import {
+    listenToUserNotifications,
+    markAllNotificationsAsRead,
+    markNotificationAsRead,
+    UserNotification
+} from './services/notificationService';
 
-type NotificationType = 'critical' | 'urgent' | 'info' | 'success';
+type NotificationType = 'critical' | 'urgent' | 'info' | 'success' | 'general' | 'reminder' | 'event';
 
 type NotificationItem = {
   id: string;
@@ -24,69 +32,97 @@ type NotificationItem = {
   read: boolean;
 };
 
-const initialNotifications: NotificationItem[] = [
-  {
-    id: 'n1',
-    type: 'critical',
-    title: 'Critical Blood Request',
-    body: 'O- blood urgently needed for emergency surgery at City Hospital',
-    time: '5m',
-    read: false,
-  },
-  {
-    id: 'n2',
-    type: 'urgent',
-    title: 'Blood Donation Request',
-    body: 'A+ blood needed for cancer treatment. Your donation can save a life!',
-    time: '1h',
-    read: false,
-  },
-  {
-    id: 'n3',
-    type: 'info',
-    title: 'You are Eligible to Donate',
-    body: 'Great news! You can now donate blood again. Schedule your appointment.',
-    time: '2h',
-    read: false,
-  },
-  {
-    id: 'n4',
-    type: 'success',
-    title: 'Donation Confirmed ✓',
-    body: 'Your appointment has been confirmed for tomorrow at 10:00 AM',
-    time: '5h',
-    read: true,
-  },
-  {
-    id: 'n5',
-    type: 'success',
-    title: 'Achievement Unlocked! 🏆',
-    body: 'Congratulations! You have been upgraded to Gold Donor status',
-    time: '1d',
-    read: true,
-  },
-  {
-    id: 'n6',
-    type: 'info',
-    title: 'Thank You for Your Donation',
-    body: 'Your recent blood donation has helped save 3 lives. Keep up the great work!',
-    time: '2d',
-    read: true,
-  },
-];
-
 export default function NotificationsScreen() {
   const { t } = useLocalization();
   const router = useRouter();
   const { themeMode } = useAppearance();
   const isDark = themeMode === 'dark';
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+  const [loading, setLoading] = useState(true);
 
   const styles = createStyles(isDark);
 
-  function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  // Real-time listener for user notifications
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    const unsubscribe = listenToUserNotifications(
+      currentUser.uid,
+      (firebaseNotifications: UserNotification[]) => {
+        // Convert Firebase notifications to display format
+        const formattedNotifications: NotificationItem[] = firebaseNotifications.map((notif) => {
+          const timeAgo = getTimeAgo(notif.receivedAt?.toDate?.() || new Date());
+          
+          return {
+            id: notif.id,
+            type: mapNotificationType(notif.type),
+            title: notif.title,
+            body: notif.message,
+            time: timeAgo,
+            read: notif.read,
+          };
+        });
+
+        setNotifications(formattedNotifications);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error loading notifications:', error);
+        setLoading(false);
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, []);
+
+  // Map notification types
+  const mapNotificationType = (type: string): NotificationType => {
+    const typeMap: Record<string, NotificationType> = {
+      'critical': 'critical',
+      'urgent': 'urgent',
+      'info': 'info',
+      'success': 'success',
+      'general': 'info',
+      'reminder': 'info',
+      'event': 'info',
+    };
+    return typeMap[type] || 'info';
+  };
+
+  // Calculate time ago
+  const getTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
+    return date.toLocaleDateString();
+  };
+
+  async function markAllRead() {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      await markAllNotificationsAsRead(currentUser.uid);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   }
 
   function clearAll() {
@@ -97,10 +133,21 @@ export default function NotificationsScreen() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }
 
-  function toggleRead(id: string) {
-    setNotifications((prev) => 
-      prev.map((n) => n.id === id ? { ...n, read: !n.read } : n)
-    );
+  async function toggleRead(id: string) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const notification = notifications.find((n) => n.id === id);
+    if (!notification || notification.read) return;
+
+    try {
+      await markNotificationAsRead(id, currentUser.uid);
+      setNotifications((prev) => 
+        prev.map((n) => n.id === id ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   }
 
   const displayedNotifications = notifications.filter((n) => 
@@ -179,7 +226,12 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
       >
-        {displayedNotifications.length === 0 ? (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#DC143C" />
+            <Text style={styles.loadingText}>Loading notifications...</Text>
+          </View>
+        ) : displayedNotifications.length === 0 ? (
           <View style={styles.emptyState}>
             <LinearGradient
               colors={isDark ? ['#374151', '#4B5563'] : ['#F3F4F6', '#E5E7EB']}
@@ -602,6 +654,19 @@ const createStyles = (isDark: boolean) => {
       color: colors.textSecondary,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    
+    // Loading State
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 80,
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: baseFontSize,
+      color: colors.textSecondary,
     },
   });
 };
