@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,42 +12,153 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
+import { DonationRequest, fetchDonationRequestById } from './services/donationRequestService';
 
-const mockRequest = {
-  bloodType: 'O-',
-  unitsNeeded: 2,
-  urgency: 'Critical Priority',
-  patient: {
-    name: 'Nimal Perera',
-    age: '34 years',
-    bloodType: 'O-',
-    condition: 'Emergency Surgery',
-    status: 'Urgent - Active',
-    notes:
-      'Patient scheduled for emergency surgery following car accident. O- blood type urgently needed for transfusion. Patient is stable but requires immediate intervention.',
-  },
-  hospital: {
-    name: 'National Hospital of Sri Lanka',
-    department: 'Emergency Department',
-    location: 'Colombo 10',
-    distance: '2.1 km',
-    contactPerson: 'Dr. Ajith Fernando',
-    contactPhone: '+94 11 269 1111',
-  },
-  timeline: {
-    requested: '2 hours ago',
-    requestedBy: 'Dr. Ajith Fernando',
-    requiredBy: 'Today, 6:00 PM',
-  },
+const normalizeUrgencyLabel = (value?: string) => {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('critical')) return 'Critical Priority';
+  if (normalized.includes('urgent')) return 'Urgent';
+  return 'Normal Priority';
+};
+
+const formatTimeAgo = (date?: Date | null): string => {
+  if (!date) return 'just now';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins} mins ago`;
+  if (diffHours < 24) return `${diffHours} hrs ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+};
+
+const formatDistance = (raw?: string): string => {
+  if (!raw) return 'Nearby';
+  const trimmed = raw.toString().trim();
+  return /^\d+(\.\d+)?$/.test(trimmed) ? `${trimmed} km away` : trimmed;
+};
+
+const buildLocationText = (request: DonationRequest): string => {
+  if (request.hospitalLocationText) return request.hospitalLocationText;
+
+  const parts = [
+    request.hospitalLocation?.street,
+    request.hospitalLocation?.city,
+    request.hospitalLocation?.state,
+    request.hospitalLocation?.zipCode,
+  ].filter(Boolean);
+
+  return parts.join(', ') || 'Location unavailable';
+};
+
+const formatRequiredBy = (value?: string): string => {
+  if (!value) return 'As soon as possible';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toDateString();
 };
 
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { themeMode } = useAppearance();
   const isDark = themeMode === 'dark';
-  useLocalSearchParams<{ id?: string }>();
-  const data = mockRequest;
+  const params = useLocalSearchParams<{ id?: string }>();
+  const requestId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [request, setRequest] = useState<DonationRequest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const styles = createStyles(isDark);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!requestId) {
+      setError('Missing request id.');
+      setLoading(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setLoading(true);
+    fetchDonationRequestById(requestId)
+      .then((data) => {
+        if (!mounted) return;
+        if (!data) {
+          setError('Request not found.');
+        } else {
+          setRequest(data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        console.error('Error loading request', err);
+        if (mounted) {
+          setError('Unable to load this request right now.');
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
+
+  const displayData = useMemo(() => {
+    if (!request) return null;
+    return {
+      bloodType: request.bloodType || 'N/A',
+      unitsNeeded: request.units || 0,
+      urgency: normalizeUrgencyLabel(request.priorityLevel || request.urgency || request.patientStatus),
+      patientName: request.patientName || 'Unknown patient',
+      patientAge: request.patientAge ? `${request.patientAge} years` : 'Age not specified',
+      patientBloodType: request.bloodType || 'N/A',
+      condition: request.medicalCondition || 'Not provided',
+      status: request.patientStatus || request.status || 'Pending',
+      notes: request.notes || 'No additional notes provided.',
+      hospitalName: request.hospital || 'Hospital',
+      department: request.hospitalDepartment || 'Department not specified',
+      location: buildLocationText(request),
+      distance: formatDistance(request.hospitalDistance),
+      contactPerson: request.contactPerson || 'Hospital contact',
+      contactPhone: request.contactPhone || request.hospitalPhone || 'Not provided',
+      requestedTime: formatTimeAgo(request.createdAt),
+      requestedBy: request.contactPerson || request.hospital || 'Hospital team',
+      requiredBy: formatRequiredBy(request.date),
+    };
+  }, [request]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={[styles.pageBackground, styles.centeredState]}>
+          <ActivityIndicator color="#FFFFFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!displayData) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={[styles.pageBackground, styles.centeredState]}>
+          <Text style={styles.errorTitle}>Unable to load request</Text>
+          <Text style={styles.errorSubtitle}>{error || 'Please try again later.'}</Text>
+          <TouchableOpacity style={styles.errorButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
+            <Text style={styles.errorButtonText}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -77,13 +189,13 @@ export default function RequestDetailScreen() {
                   <Ionicons name="water" size={26} color="#DC2626" />
                 </View>
                 <View style={styles.heroMetricsText}>
-                  <Text style={styles.heroBloodType}>{data.bloodType}</Text>
-                  <Text style={styles.heroUnits}>{data.unitsNeeded} units needed</Text>
+                  <Text style={styles.heroBloodType}>{displayData.bloodType}</Text>
+                  <Text style={styles.heroUnits}>{displayData.unitsNeeded} units needed</Text>
                 </View>
               </View>
               <View style={styles.heroPill}>
                 <Ionicons name="medkit" size={14} color="#DC2626" />
-                <Text style={styles.heroPillText}>{data.urgency}</Text>
+                <Text style={styles.heroPillText}>{displayData.urgency}</Text>
               </View>
             </View>
           </LinearGradient>
@@ -97,34 +209,34 @@ export default function RequestDetailScreen() {
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Patient Name</Text>
-              <Text style={styles.infoValue}>{data.patient.name}</Text>
+              <Text style={styles.infoValue}>{displayData.patientName}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Age</Text>
-              <Text style={styles.infoValue}>{data.patient.age}</Text>
+              <Text style={styles.infoValue}>{displayData.patientAge}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Blood Type</Text>
               <View style={styles.outlinedPill}>
-                <Text style={styles.outlinedPillText}>{data.patient.bloodType}</Text>
+                <Text style={styles.outlinedPillText}>{displayData.patientBloodType}</Text>
               </View>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Medical Condition</Text>
               <Text style={[styles.infoValue, styles.infoValueEmphasis]}>
-                {data.patient.condition}
+                {displayData.condition}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Status</Text>
               <View style={styles.statusPill}>
-                <Text style={styles.statusPillText}>{data.patient.status}</Text>
+                <Text style={styles.statusPillText}>{displayData.status}</Text>
               </View>
             </View>
             <View style={styles.infoDivider} />
             <View style={styles.notesBlock}>
               <Text style={styles.notesLabel}>Medical Notes</Text>
-              <Text style={styles.notesValue}>{data.patient.notes}</Text>
+              <Text style={styles.notesValue}>{displayData.notes}</Text>
             </View>
           </View>
 
@@ -137,32 +249,32 @@ export default function RequestDetailScreen() {
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Hospital</Text>
-              <Text style={styles.infoValue}>{data.hospital.name}</Text>
+              <Text style={styles.infoValue}>{displayData.hospitalName}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Department</Text>
-              <Text style={styles.infoValue}>{data.hospital.department}</Text>
+              <Text style={styles.infoValue}>{displayData.department}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{data.hospital.location}</Text>
+              <Text style={styles.infoValue}>{displayData.location}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Distance</Text>
               <Text style={[styles.infoValue, styles.infoValueAccent]}>
-                {data.hospital.distance}
+                {displayData.distance}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact Person</Text>
-              <Text style={styles.infoValue}>{data.hospital.contactPerson}</Text>
+              <Text style={styles.infoValue}>{displayData.contactPerson}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact Phone</Text>
               <View style={styles.phoneRow}>
                 <Ionicons name="call" size={16} color="#DC2626" />
                 <Text style={[styles.infoValue, styles.infoValueAccent]}>
-                  {data.hospital.contactPhone}
+                  {displayData.contactPhone}
                 </Text>
               </View>
             </View>
@@ -177,18 +289,18 @@ export default function RequestDetailScreen() {
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Requested</Text>
-              <Text style={styles.infoValue}>{data.timeline.requested}</Text>
+              <Text style={styles.infoValue}>{displayData.requestedTime}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Requested By</Text>
-              <Text style={styles.infoValue}>{data.timeline.requestedBy}</Text>
+              <Text style={styles.infoValue}>{displayData.requestedBy}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Required By</Text>
               <View style={styles.outlinedPill}>
                 <Ionicons name="calendar-outline" size={14} color="#EA580C" />
                 <Text style={[styles.outlinedPillText, styles.requiredText]}>
-                  {data.timeline.requiredBy}
+                  {displayData.requiredBy}
                 </Text>
               </View>
             </View>
@@ -208,8 +320,8 @@ export default function RequestDetailScreen() {
             onPress={() => router.push({ 
               pathname: '/chat', 
               params: { 
-                facilityName: data.hospital.name,
-                facilityId: data.hospital.name.replace(/\s+/g, '-').toLowerCase()
+                facilityName: displayData.hospitalName,
+                facilityId: request?.hospitalId || displayData.hospitalName.replace(/\s+/g, '-').toLowerCase()
               } 
             })}
           >
@@ -238,6 +350,38 @@ const createStyles = (isDark: boolean) => {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.primary },
   pageBackground: { flex: 1, backgroundColor: colors.backgroundSecondary },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  errorTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  errorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   container: { flex: 1 },
   contentContainer: { paddingBottom: 120 },
   heroCard: {

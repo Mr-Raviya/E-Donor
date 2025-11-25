@@ -3,21 +3,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    BackHandler,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  BackHandler,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUnreadNotifications } from '../hooks/use-unread-notifications';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
+import { DonationRequest, listenToDonationRequests } from './services/donationRequestService';
 
-type UrgencyLevel = 'Critical' | 'Urgent' | 'Moderate';
+type UrgencyLevel = 'Critical' | 'Urgent' | 'Moderate' | 'Normal';
 
 type RequestCard = {
   id: string;
@@ -38,43 +40,64 @@ const urgencyTokens: Record<
   Critical: { label: 'Critical', background: '#FEE2E2', textColor: '#DC2626' },
   Urgent: { label: 'Urgent', background: '#FDE68A', textColor: '#B45309' },
   Moderate: { label: 'Moderate', background: '#FEF9C3', textColor: '#A16207' },
+  Normal: { label: 'Normal', background: '#DBEAFE', textColor: '#2563EB' },
 };
 
-const requests: RequestCard[] = [
-  {
-    id: '1',
-    bloodType: 'O-',
-    urgency: 'Critical',
-    facility: 'National Hospital of Sri Lanka',
-    requestTitle: 'Emergency Surgery',
-    location: 'Colombo 10',
-    distance: '2.1 km',
-    units: 2,
-    timeAgo: '2 hours ago',
-  },
-  {
-    id: '2',
-    bloodType: 'A+',
-    urgency: 'Urgent',
-    facility: 'Lanka Hospitals',
-    requestTitle: 'Cancer Treatment',
-    location: 'Colombo 05',
-    distance: '3.5 km',
-    units: 1,
-    timeAgo: '4 hours ago',
-  },
-  {
-    id: '3',
-    bloodType: 'B+',
-    urgency: 'Moderate',
-    facility: 'Asiri Central Hospital',
-    requestTitle: 'Accident Victim',
-    location: 'Colombo 08',
-    distance: '5.2 km',
-    units: 3,
-    timeAgo: '1 day ago',
-  },
-];
+const normalizeUrgency = (value?: string): UrgencyLevel => {
+  const normalized = (value || '').toLowerCase().trim();
+  if (!normalized) return 'Moderate';
+  if (normalized.includes('crit')) return 'Critical';
+  // Handles "urgent", common typos like "urgant", and "high"
+  if (normalized.includes('urg') || normalized.includes('high')) return 'Urgent';
+  if (normalized.includes('norm') || normalized.includes('low')) return 'Normal';
+  return 'Moderate';
+};
+
+const formatTimeAgo = (date?: Date | null): string => {
+  if (!date) return 'just now';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins} mins ago`;
+  if (diffHours < 24) return `${diffHours} hrs ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+};
+
+const formatDistance = (raw?: string): string => {
+  if (!raw) return 'Nearby';
+  const trimmed = raw.toString().trim();
+  return /^\d+(\.\d+)?$/.test(trimmed) ? `${trimmed} km` : trimmed;
+};
+
+const buildLocationText = (request: DonationRequest): string => {
+  if (request.hospitalLocationText) return request.hospitalLocationText;
+
+  const parts = [
+    request.hospitalLocation?.street,
+    request.hospitalLocation?.city,
+    request.hospitalLocation?.state,
+    request.hospitalLocation?.zipCode,
+  ].filter(Boolean);
+
+  return parts.join(', ') || 'Location unavailable';
+};
+
+const mapDonationRequestToCard = (request: DonationRequest): RequestCard => ({
+  id: request.id,
+  bloodType: request.bloodType || 'N/A',
+  urgency: normalizeUrgency(request.priorityLevel || request.urgency || request.patientStatus),
+  facility: request.hospital || 'Hospital',
+  requestTitle: request.medicalCondition || request.patientStatus || 'Blood request',
+  location: buildLocationText(request),
+  distance: formatDistance(request.hospitalDistance),
+  units: request.units || 0,
+  timeAgo: formatTimeAgo(request.createdAt),
+});
 
 const tabs = [
   { key: 'requests', label: 'Find Requests' },
@@ -112,8 +135,13 @@ export default function HomeScreen() {
   const { themeMode } = useAppearance();
   const { user } = useUser();
   const isDark = themeMode === 'dark';
+  const donationCount = user.donationCount ?? 0;
+  const livesSaved = useMemo(() => Math.max(0, donationCount * 3), [donationCount]);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
-  const activeCount = useMemo(() => requests.length, []);
+  const [requestCards, setRequestCards] = useState<RequestCard[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const activeCount = useMemo(() => requestCards.length, [requestCards]);
   const router = useRouter();
   const unreadCount = useUnreadNotifications();
 
@@ -125,6 +153,24 @@ export default function HomeScreen() {
     });
 
     return () => backHandler.remove();
+  }, []);
+
+  useEffect(() => {
+    setLoadingRequests(true);
+    const unsubscribe = listenToDonationRequests(
+      (firebaseRequests) => {
+        setRequestCards(firebaseRequests.map(mapDonationRequestToCard));
+        setRequestError(null);
+        setLoadingRequests(false);
+      },
+      (error) => {
+        console.error('Error loading donation requests', error);
+        setRequestError('Unable to load blood requests right now.');
+        setLoadingRequests(false);
+      },
+    );
+
+    return () => unsubscribe();
   }, []);
 
   const styles = createStyles(isDark, locale);
@@ -233,7 +279,7 @@ export default function HomeScreen() {
               <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : 'rgba(255,255,255,0.9)' }]}>
                 <Ionicons name="heart" size={20} color="#DC2626" />
               </View>
-              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>12</Text>
+              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>{donationCount}</Text>
               <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Total Donations</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -245,7 +291,7 @@ export default function HomeScreen() {
               <View style={[styles.statIconWrapper, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(255,255,255,0.9)' }]}>
                 <Ionicons name="people" size={20} color="#2563EB" />
               </View>
-              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>36</Text>
+              <Text style={[styles.statValue, { color: isDark ? '#fff' : '#1F2937' }]}>{livesSaved}</Text>
               <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Lives Saved</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -291,7 +337,7 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>{t('urgentBloodRequests')}</Text>
+                <Text style={styles.sectionTitle}>{t('Blood Requests')}</Text>
                 <Text style={styles.sectionSubtitle}>{t('helpSaveLives')}</Text>
               </View>
               <View style={styles.activeBadge}>
@@ -301,68 +347,82 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.requestList}>
-              {requests.map((request) => {
-                const urgency = urgencyTokens[request.urgency];
-                return (
-                  <TouchableOpacity 
-                    key={request.id} 
-                    style={styles.requestCard}
-                    activeOpacity={0.95}
-                    onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
-                  >
-                    <LinearGradient
-                      colors={isDark ? ['#2a2a2a', '#2a2a2a'] : ['#FFFFFF', '#FFFFFF']}
-                      style={styles.requestCardGradient}
+              {loadingRequests ? (
+                <ActivityIndicator color="#DC2626" size="small" style={{ marginTop: 12 }} />
+              ) : requestError ? (
+                <Text style={styles.errorText}>{requestError}</Text>
+              ) : requestCards.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Ionicons name="water-outline" size={26} color="#DC2626" />
+                  </View>
+                  <Text style={styles.emptyTitle}>No requests right now</Text>
+                  <Text style={styles.emptySubtitle}>Hospitals will post new blood requests here.</Text>
+                </View>
+              ) : (
+                requestCards.map((request) => {
+                  const urgency = urgencyTokens[request.urgency];
+                  return (
+                    <TouchableOpacity 
+                      key={request.id} 
+                      style={styles.requestCard}
+                      activeOpacity={0.95}
+                      onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
                     >
-                      {/* Blood Type Badge */}
-                      <View style={styles.bloodTypeSection}>
-                        <LinearGradient
-                          colors={['#DC2626', '#B91C1C']}
-                          style={styles.bloodTypeBadge}
-                        >
-                          <Ionicons name="water" size={14} color="#FFFFFF" />
-                          <Text style={styles.bloodTypeTextLarge}>{request.bloodType}</Text>
-                        </LinearGradient>
-                        <View style={styles.requestMeta}>
-                          <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
-                            <View style={[styles.urgencyDot, { backgroundColor: urgency.textColor }]} />
-                            <Text style={[styles.urgencyLabel, { color: urgency.textColor }]}>
-                              {urgency.label}
-                            </Text>
-                          </View>
-                          <Text style={styles.timeAgoText}>{request.timeAgo}</Text>
-                        </View>
-                      </View>
-
-                      {/* Request Info */}
-                      <View style={styles.requestInfo}>
-                        <Text style={styles.requestTitleText}>{request.requestTitle}</Text>
-                        <Text style={styles.facilityName}>{request.facility}</Text>
-                        
-                        <View style={styles.requestDetails}>
-                          <View style={styles.detailItem}>
-                            <Ionicons name="location" size={14} color="#DC2626" />
-                            <Text style={styles.detailText}>{request.distance}</Text>
-                          </View>
-                          <View style={styles.detailItem}>
-                            <Ionicons name="medkit" size={14} color="#DC2626" />
-                            <Text style={styles.detailText}>{request.units} units needed</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Action Button */}
-                      <TouchableOpacity 
-                        style={styles.respondButtonSmall}
-                        onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
+                      <LinearGradient
+                        colors={isDark ? ['#2a2a2a', '#2a2a2a'] : ['#FFFFFF', '#FFFFFF']}
+                        style={styles.requestCardGradient}
                       >
-                        <Text style={styles.respondTextSmall}>{t('respond')}</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                );
-              })}
+                        {/* Blood Type Badge */}
+                        <View style={styles.bloodTypeSection}>
+                          <LinearGradient
+                            colors={['#DC2626', '#B91C1C']}
+                            style={styles.bloodTypeBadge}
+                          >
+                            <Ionicons name="water" size={14} color="#FFFFFF" />
+                            <Text style={styles.bloodTypeTextLarge}>{request.bloodType}</Text>
+                          </LinearGradient>
+                          <View style={styles.requestMeta}>
+                            <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
+                              <View style={[styles.urgencyDot, { backgroundColor: urgency.textColor }]} />
+                              <Text style={[styles.urgencyLabel, { color: urgency.textColor }]}>
+                                {urgency.label}
+                              </Text>
+                            </View>
+                            <Text style={styles.timeAgoText}>{request.timeAgo}</Text>
+                          </View>
+                        </View>
+
+                        {/* Request Info */}
+                        <View style={styles.requestInfo}>
+                          <Text style={styles.requestTitleText}>{request.requestTitle}</Text>
+                          <Text style={styles.facilityName}>{request.facility}</Text>
+                          
+                          <View style={styles.requestDetails}>
+                            <View style={styles.detailItem}>
+                              <Ionicons name="location" size={14} color="#DC2626" />
+                              <Text style={styles.detailText}>{request.distance}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                              <Ionicons name="medkit" size={14} color="#DC2626" />
+                              <Text style={styles.detailText}>{request.units} units needed</Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Action Button */}
+                        <TouchableOpacity 
+                          style={styles.respondButtonSmall}
+                          onPress={() => router.push({ pathname: '/request-detail', params: { id: request.id } })}
+                        >
+                          <Text style={styles.respondTextSmall}>{t('respond')}</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </View>
           </>
         ) : (
@@ -812,6 +872,7 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
   sectionSubtitle: {
     fontSize: baseFontSize - 2,
     color: colors.textSecondary,
+    textAlign: 'left',
   },
   activeBadge: {
     flexDirection: 'row',
@@ -846,6 +907,36 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
   requestList: {
     paddingHorizontal: 24,
     gap: 12,
+  },
+  errorText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 6,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardBackground,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: baseFontSize + 2,
+  },
+  emptySubtitle: {
+    color: colors.textSecondary,
+    fontSize: baseFontSize - 1,
   },
   requestCard: {
     borderRadius: 18,

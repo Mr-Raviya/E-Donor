@@ -53,14 +53,9 @@ export default function SettingsPanel() {
   const [notifyPush, setNotifyPush] = useState(true);
 
   // Accessibility
-  const [highContrast, setHighContrast] = useState(false);
-  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
-  const [soundEffects, setSoundEffects] = useState(true);
   const [haptics, setHaptics] = useState(true);
 
   // Privacy
-  const [locationSharing, setLocationSharing] = useState(false);
-  const [profileVisible, setProfileVisible] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   // Change Password Modal
@@ -249,73 +244,24 @@ export default function SettingsPanel() {
     },
   ];
 
-  // Accessibility Settings
-  const accessibilitySettings: SettingItem[] = [
+  // Privacy Settings
+  const privacySettings: SettingItem[] = [
     {
       id: '1',
-      title: t('highContrast'),
-      subtitle: 'Increase contrast for better visibility',
-      icon: 'contrast',
-      type: 'toggle',
-      value: highContrast,
-      action: () => setHighContrast(!highContrast),
+      title: t('changePassword'),
+      subtitle: 'Update your password',
+      icon: 'lock-closed',
+      type: 'action',
+      action: handleChangePassword,
     },
     {
       id: '2',
-      title: t('screenReader'),
-      subtitle: 'Screen reader support',
-      icon: 'book',
-      type: 'toggle',
-      value: screenReaderEnabled,
-      action: () => setScreenReaderEnabled(!screenReaderEnabled),
-    },
-    {
-      id: '3',
-      title: t('soundEffects'),
-      subtitle: 'Enable sound effects',
-      icon: 'volume-high',
-      type: 'toggle',
-      value: soundEffects,
-      action: () => setSoundEffects(!soundEffects),
-    },
-    {
-      id: '4',
       title: t('haptics'),
       subtitle: 'Haptic feedback',
       icon: 'hand-left',
       type: 'toggle',
       value: haptics,
       action: () => setHaptics(!haptics),
-    },
-  ];
-
-  // Privacy Settings
-  const privacySettings: SettingItem[] = [
-    {
-      id: '1',
-      title: t('locationSharing'),
-      subtitle: 'Share location with hospitals',
-      icon: 'location',
-      type: 'toggle',
-      value: locationSharing,
-      action: () => setLocationSharing(!locationSharing),
-    },
-    {
-      id: '2',
-      title: t('profileVisibility'),
-      subtitle: 'Make profile visible to others',
-      icon: 'eye',
-      type: 'toggle',
-      value: profileVisible,
-      action: () => setProfileVisible(!profileVisible),
-    },
-    {
-      id: '3',
-      title: t('changePassword'),
-      subtitle: 'Update your password',
-      icon: 'lock-closed',
-      type: 'action',
-      action: handleChangePassword,
     },
   ];
 
@@ -443,14 +389,6 @@ export default function SettingsPanel() {
           <Text style={[styles.sectionTitle, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>{t('notifications')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#fff' }]}>
             {notificationSettings.map(renderSettingItem)}
-          </View>
-        </View>
-
-        {/* Accessibility Settings */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>{t('accessibility')}</Text>
-          <View style={[styles.settingsGroup, { backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#fff' }]}>
-            {accessibilitySettings.map(renderSettingItem)}
           </View>
         </View>
 

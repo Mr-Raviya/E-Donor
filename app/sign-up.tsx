@@ -423,8 +423,15 @@ export default function SignUpScreen() {
       });
       
       setSuccessModalVisible(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unexpected error occurred.';
+    } catch (error: any) {
+      const rawMessage = error?.message ?? (error instanceof Error ? error.message : '');
+      const normalizedMessage = typeof rawMessage === 'string' ? rawMessage.toLowerCase() : '';
+      let message = rawMessage || 'Unexpected error occurred.';
+
+      if (error?.code === 'auth/network-request-failed' || normalizedMessage.includes('network request failed')) {
+        message = 'Please check your internet connection and try again.';
+      }
+
       Alert.alert('Unable to create account', message);
     } finally {
       setCreatingAccount(false);

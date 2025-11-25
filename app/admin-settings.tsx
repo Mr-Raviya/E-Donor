@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -36,10 +35,8 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState({
     emailNotifications: true,
     pushNotifications: true,
-    autoApproveRequests: false,
     lowStockAlerts: true,
     maintenanceMode: false,
-    twoFactorAuth: false,
   });
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -58,31 +55,6 @@ export default function AdminSettings() {
     setLogoutModalVisible(false);
     await logout();
     router.replace('/sign-in');
-  };
-
-  const handleClearCache = () => {
-    Alert.alert(
-      'Clear Cache',
-      'This will clear all cached data. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Success', 'Cache cleared successfully');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleExportData = () => {
-    Alert.alert('Export Data', 'Data export started. You will receive a notification when complete.');
-  };
-
-  const handleBackup = () => {
-    Alert.alert('Backup', 'Database backup initiated successfully.');
   };
 
   const appearanceSettings: SettingItem[] = [
@@ -130,57 +102,12 @@ export default function AdminSettings() {
   const systemSettings: SettingItem[] = [
     {
       id: '1',
-      title: 'Auto-Approve Requests',
-      subtitle: 'Automatically approve blood requests',
-      icon: 'checkmark-circle',
-      type: 'toggle',
-      value: settings.autoApproveRequests,
-      action: () => handleToggle('autoApproveRequests'),
-    },
-    {
-      id: '2',
       title: 'Maintenance Mode',
       subtitle: 'Restrict app access for maintenance',
       icon: 'construct',
       type: 'toggle',
       value: settings.maintenanceMode,
       action: () => handleToggle('maintenanceMode'),
-    },
-    {
-      id: '3',
-      title: 'Two-Factor Authentication',
-      subtitle: 'Extra security for admin login',
-      icon: 'shield-checkmark',
-      type: 'toggle',
-      value: settings.twoFactorAuth,
-      action: () => handleToggle('twoFactorAuth'),
-    },
-  ];
-
-  const dataSettings: SettingItem[] = [
-    {
-      id: '1',
-      title: 'Export Data',
-      subtitle: 'Export all system data',
-      icon: 'download',
-      type: 'action',
-      action: handleExportData,
-    },
-    {
-      id: '2',
-      title: 'Backup Database',
-      subtitle: 'Create a database backup',
-      icon: 'cloud-upload',
-      type: 'action',
-      action: handleBackup,
-    },
-    {
-      id: '3',
-      title: 'Clear Cache',
-      subtitle: 'Remove temporary files',
-      icon: 'trash',
-      type: 'action',
-      action: handleClearCache,
     },
   ];
 
@@ -277,14 +204,6 @@ export default function AdminSettings() {
           </View>
         </View>
 
-        {/* Data Management */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>Data Management</Text>
-          <View style={[styles.settingsGroup, { backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#fff' }]}>
-            {dataSettings.map(renderSettingItem)}
-          </View>
-        </View>
-
         {/* About */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>About</Text>
@@ -296,10 +215,6 @@ export default function AdminSettings() {
             <View style={[styles.infoItem, { borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#f0f0f0' }]}>
               <Text style={[styles.infoLabel, { color: themeMode === 'dark' ? '#999' : '#666' }]}>Build</Text>
               <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>2025.11.06</Text>
-            </View>
-            <View style={[styles.infoItem, { borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#f0f0f0' }]}>
-              <Text style={[styles.infoLabel, { color: themeMode === 'dark' ? '#999' : '#666' }]}>Environment</Text>
-              <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>Production</Text>
             </View>
           </View>
         </View>

@@ -117,10 +117,18 @@ export default function SignInScreen() {
     } catch (error: any) {
       setSigningIn(false);
       // Check for specific error messages
+      const errorCode = error?.code;
       const errorMsg = error?.message || '';
-      if (errorMsg.includes('deactivated')) {
+      const normalizedMessage = errorMsg.toLowerCase();
+      if (errorCode === 'auth/network-request-failed' || normalizedMessage.includes('network request failed')) {
+        setErrorMessage('Please check your internet connection and try again.');
+      } else if (normalizedMessage.includes('deactivated')) {
         setErrorMessage('Your account has been deactivated. Please contact support for assistance.');
-      } else if (errorMsg.includes('invalid-credential') || errorMsg.includes('wrong-password') || errorMsg.includes('user-not-found')) {
+      } else if (
+        normalizedMessage.includes('invalid-credential') ||
+        normalizedMessage.includes('wrong-password') ||
+        normalizedMessage.includes('user-not-found')
+      ) {
         setErrorMessage('Email or password is incorrect. Please try again.');
       } else {
         setErrorMessage('Unable to sign in. Please check your credentials and try again.');
