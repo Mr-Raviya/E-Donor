@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -25,6 +26,7 @@ import {
     type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth } from '../lib/firebase';
 import { useAdmin } from './contexts/AdminContext';
 import { useUser } from './contexts/UserContext';
 
@@ -51,6 +53,7 @@ export default function SignInScreen() {
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [resetSuccessVisible, setResetSuccessVisible] = useState(false);
   const signInShake = useRef(new Animated.Value(0)).current;
   const resetShake = useRef(new Animated.Value(0)).current;
   const resetModalTranslate = useRef(new Animated.Value(RESET_MODAL_OFFSCREEN)).current;
@@ -126,7 +129,7 @@ export default function SignInScreen() {
     }
   };
 
-  const handleResetLink = () => {
+  const handleResetLink = async () => {
     if (resetSubmitting) {
       return;
     }
@@ -143,11 +146,44 @@ export default function SignInScreen() {
     }
     setResetError(undefined);
     setResetSubmitting(true);
-    setTimeout(() => {
+    
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setResetSubmitting(false);
-      closeForgotModal();
-      // TODO: Integrate with actual reset password flow.
-    }, 1200);
+      // Close forgot modal and show success modal after animation completes
+      Keyboard.dismiss();
+      setResetError(undefined);
+      Animated.timing(resetModalTranslate, {
+        toValue: RESET_MODAL_OFFSCREEN,
+        duration: 300,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          setForgotVisible(false);
+          setKeyboardVisible(false);
+          resetModalTranslate.setValue(RESET_MODAL_OFFSCREEN);
+          // Show success modal after forgot modal is closed
+          setResetSuccessVisible(true);
+        }
+      });
+    } catch (error: any) {
+      setResetSubmitting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      let errorMsg = 'Failed to send reset email. Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMsg = 'No account found with this email address.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMsg = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMsg = 'Too many attempts. Please try again later.';
+      }
+      
+      setResetError(errorMsg);
+      triggerShake(resetShake);
+    }
   };
 
   const openForgotModal = useCallback(() => {
@@ -467,6 +503,33 @@ export default function SignInScreen() {
             </KeyboardAvoidingView>
           </View>
         </Modal>
+
+        {/* Password Reset Success Modal */}
+        <Modal
+          animationType="fade"
+          transparent
+          visible={resetSuccessVisible}
+          onRequestClose={() => setResetSuccessVisible(false)}
+        >
+          <View style={styles.resetSuccessOverlay}>
+            <View style={styles.resetSuccessCard}>
+              <View style={styles.resetSuccessIconContainer}>
+                <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+              </View>
+              <Text style={styles.resetSuccessTitle}>Success!</Text>
+              <Text style={styles.resetSuccessMessage}>
+                Password reset link has been sent to your email. Please check your inbox.
+              </Text>
+              <TouchableOpacity
+                style={styles.resetSuccessButton}
+                onPress={() => setResetSuccessVisible(false)}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.resetSuccessButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
@@ -758,6 +821,61 @@ const styles = StyleSheet.create({
   },
   modalPrimaryText: {
     fontSize: 15,
+    fontWeight: '700',
+    color: 'white',
+  },
+  resetSuccessOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  resetSuccessCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 32,
+    backgroundColor: 'white',
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    elevation: 15,
+  },
+  resetSuccessIconContainer: {
+    marginBottom: 20,
+  },
+  resetSuccessTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  resetSuccessMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  resetSuccessButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  resetSuccessButtonText: {
+    fontSize: 16,
     fontWeight: '700',
     color: 'white',
   },

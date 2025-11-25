@@ -2,20 +2,28 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Linking,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth } from '../lib/firebase';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
@@ -54,6 +62,94 @@ export default function SettingsPanel() {
   const [locationSharing, setLocationSharing] = useState(false);
   const [profileVisible, setProfileVisible] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  // Change Password Modal
+  const [changePasswordModalVisible, setChangePasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const handleChangePassword = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangePasswordModalVisible(true);
+  };
+
+  const confirmChangePassword = async () => {
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      Alert.alert('Error', 'New password must be different from current password');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) {
+        Alert.alert('Error', 'No user is currently logged in');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      // Re-authenticate the user
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Update password
+      await updatePassword(currentUser, newPassword);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setChangePasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      Alert.alert(
+        'Success',
+        'Your password has been updated successfully. Please use your new password for future logins.',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      let errorMessage = 'Failed to change password. Please try again.';
+      
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'Current password is incorrect';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'New password is too weak. Please use a stronger password.';
+      } else if (error.code === 'auth/requires-recent-login') {
+        errorMessage = 'Please log out and log back in before changing your password.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many attempts. Please try again later.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -219,7 +315,7 @@ export default function SettingsPanel() {
       subtitle: 'Update your password',
       icon: 'lock-closed',
       type: 'action',
-      action: () => Alert.alert(t('changePassword'), 'Not implemented yet'),
+      action: handleChangePassword,
     },
   ];
 
@@ -435,6 +531,110 @@ export default function SettingsPanel() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={changePasswordModalVisible}
+        onRequestClose={() => !isChangingPassword && setChangePasswordModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalCard, styles.passwordModalCard, { backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#FFFFFF' }]}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.passwordModalContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Ionicons name="lock-closed" size={56} color="#DC143C" style={{ marginBottom: 20 }} />
+                <Text style={[styles.modalTitle, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}>Change Password</Text>
+                <Text style={[styles.modalMessage, { color: themeMode === 'dark' ? '#999' : '#6B7280' }]}>Enter your current password and choose a new password</Text>
+                
+                {/* Current Password Input */}
+                <View style={[styles.passwordInputContainer, { backgroundColor: themeMode === 'dark' ? '#3a3a3a' : '#F3F4F6' }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.passwordInput, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}
+                    placeholder="Current Password"
+                    placeholderTextColor={themeMode === 'dark' ? '#666' : '#9CA3AF'}
+                    secureTextEntry={!showCurrentPassword}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    editable={!isChangingPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} disabled={isChangingPassword}>
+                    <Ionicons name={showCurrentPassword ? 'eye-off' : 'eye'} size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* New Password Input */}
+                <View style={[styles.passwordInputContainer, { backgroundColor: themeMode === 'dark' ? '#3a3a3a' : '#F3F4F6' }]}>
+                  <Ionicons name="key-outline" size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.passwordInput, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}
+                    placeholder="New Password"
+                    placeholderTextColor={themeMode === 'dark' ? '#666' : '#9CA3AF'}
+                    secureTextEntry={!showNewPassword}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    editable={!isChangingPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} disabled={isChangingPassword}>
+                    <Ionicons name={showNewPassword ? 'eye-off' : 'eye'} size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Confirm Password Input */}
+                <View style={[styles.passwordInputContainer, { backgroundColor: themeMode === 'dark' ? '#3a3a3a' : '#F3F4F6' }]}>
+                  <Ionicons name="checkmark-circle-outline" size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.passwordInput, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}
+                    placeholder="Confirm New Password"
+                    placeholderTextColor={themeMode === 'dark' ? '#666' : '#9CA3AF'}
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!isChangingPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} disabled={isChangingPassword}>
+                    <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color={themeMode === 'dark' ? '#999' : '#6B7280'} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalButtonRow}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton, { 
+                      backgroundColor: themeMode === 'dark' ? '#3a3a3a' : '#F3F4F6',
+                      borderColor: 'transparent'
+                    }]}
+                    onPress={() => setChangePasswordModalVisible(false)}
+                    activeOpacity={0.7}
+                    disabled={isChangingPassword}
+                  >
+                    <Text style={[styles.modalCancelText, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalPrimaryButton, isChangingPassword && styles.modalButtonDisabled]}
+                    onPress={confirmChangePassword}
+                    activeOpacity={0.9}
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.modalPrimaryText}>Change</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
@@ -669,5 +869,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: 'white',
+  },
+  passwordModalCard: {
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  passwordModalContent: {
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 12,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 14,
+  },
+  modalButtonDisabled: {
+    opacity: 0.7,
   },
 });
