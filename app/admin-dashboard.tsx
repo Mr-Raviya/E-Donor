@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDashboardStats } from '../hooks/use-dashboard-stats';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
@@ -84,6 +84,7 @@ export default function AdminDashboard() {
   const { admin, logout } = useAdmin();
   const { themeMode } = useAppearance();
   const isDark = themeMode === 'dark';
+  const insets = useSafeAreaInsets();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   
   // Get real-time dashboard statistics
@@ -121,7 +122,10 @@ export default function AdminDashboard() {
   const cardBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#f8f9fa' }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: bgColors[0] }]}
+      edges={['top']}
+    >
       <LinearGradient
         colors={bgColors}
         style={styles.gradient}
@@ -165,6 +169,7 @@ export default function AdminDashboard() {
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
         >
           <Text style={[styles.sectionTitle, { color: textColor }]}>Management Modules</Text>
           <View style={styles.cardsGrid}>
@@ -272,6 +277,7 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   gradient: {
     flex: 1,

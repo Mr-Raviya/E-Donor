@@ -63,6 +63,12 @@ service cloud.firestore {
       allow write: if request.auth != null && (request.auth.uid == profileId || isAdmin());
       allow create: if request.auth != null;
     }
+
+    // Hospitals collection (admin-managed)
+    match /hospitals/{hospitalId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && isAdmin();
+    }
     
     // Blood requests collection (if you have one)
     match /bloodRequests/{requestId} {

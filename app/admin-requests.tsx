@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface BloodRequest {
   id: string;
@@ -36,7 +36,7 @@ const initialRequests: BloodRequest[] = [
     unitsNeeded: 3,
     urgency: 'critical',
     hospital: 'National Hospital of Sri Lanka',
-    requestDate: '2024-11-16',
+    requestDate: '2025-11-16',
     status: 'pending',
     contactPerson: 'Dr. Priyantha Rathnayake',
     contactNumber: '+94 11 269 1111',
@@ -49,7 +49,7 @@ const initialRequests: BloodRequest[] = [
     unitsNeeded: 2,
     urgency: 'urgent',
     hospital: 'Lanka Hospitals',
-    requestDate: '2024-11-16',
+    requestDate: '2025-11-16',
     status: 'approved',
     contactPerson: 'Dr. Samanthi Jayawardena',
     contactNumber: '+94 11 543 4000',
@@ -62,7 +62,7 @@ const initialRequests: BloodRequest[] = [
     unitsNeeded: 1,
     urgency: 'normal',
     hospital: 'Asiri Central Hospital',
-    requestDate: '2024-11-15',
+    requestDate: '2025-11-15',
     status: 'fulfilled',
     contactPerson: 'Nurse Kumari',
     contactNumber: '+94 11 466 5500',
@@ -72,6 +72,7 @@ const initialRequests: BloodRequest[] = [
 
 export default function AdminRequests() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [requests, setRequests] = useState<BloodRequest[]>(initialRequests);
   const [filterStatus, setFilterStatus] = useState<'all' | BloodRequest['status']>('all');
   const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null);
@@ -165,7 +166,7 @@ export default function AdminRequests() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1a1a1a" />
@@ -214,7 +215,7 @@ export default function AdminRequests() {
         data={filteredRequests}
         renderItem={renderRequest}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
         showsVerticalScrollIndicator={false}
       />
 

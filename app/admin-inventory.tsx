@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface BloodStock {
   bloodType: string;
@@ -30,7 +30,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 23,
     lowStockThreshold: 50,
     expiringIn7Days: 8,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'A-',
@@ -38,7 +38,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 7,
     lowStockThreshold: 30,
     expiringIn7Days: 3,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'B+',
@@ -46,7 +46,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 15,
     lowStockThreshold: 40,
     expiringIn7Days: 5,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'B-',
@@ -54,7 +54,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 4,
     lowStockThreshold: 25,
     expiringIn7Days: 2,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'AB+',
@@ -62,7 +62,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 9,
     lowStockThreshold: 35,
     expiringIn7Days: 4,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'AB-',
@@ -70,7 +70,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 2,
     lowStockThreshold: 15,
     expiringIn7Days: 1,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'O+',
@@ -78,7 +78,7 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 32,
     lowStockThreshold: 60,
     expiringIn7Days: 12,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
   {
     bloodType: 'O-',
@@ -86,12 +86,13 @@ const initialInventory: BloodStock[] = [
     unitsReserved: 6,
     lowStockThreshold: 30,
     expiringIn7Days: 2,
-    lastUpdated: '2024-11-15',
+    lastUpdated: '2025-11-15',
   },
 ];
 
 export default function AdminInventory() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [inventory, setInventory] = useState<BloodStock[]>(initialInventory);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedBloodType, setSelectedBloodType] = useState<BloodStock | null>(null);
@@ -209,7 +210,7 @@ export default function AdminInventory() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1a1a1a" />
@@ -248,7 +249,7 @@ export default function AdminInventory() {
         data={inventory}
         renderItem={renderBloodStock}
         keyExtractor={(item) => item.bloodType}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
         numColumns={2}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}

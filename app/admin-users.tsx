@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   createAdminUserProfile,
   deleteAdminUserProfile,
@@ -47,6 +47,7 @@ const normalizeProfileToUser = (profile: UserProfile): User => ({
 
 export default function AdminUsers() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
@@ -241,7 +242,7 @@ export default function AdminUsers() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -310,6 +311,7 @@ export default function AdminUsers() {
           contentContainerStyle={[
             styles.listContent,
             filteredUsers.length === 0 && styles.emptyListContent,
+            { paddingBottom: Math.max(insets.bottom, 24) },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={

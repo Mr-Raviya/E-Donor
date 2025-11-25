@@ -27,9 +27,9 @@ const getBasicInfo = (t: (key: string) => string, user: any, memberSince: string
 
 const getAdditionalDetails = (t: (key: string) => string, user: any) => [
   { label: t('totalDonations'), value: '12' },
-  { label: t('lastDonation'), value: 'July 15, 2024' },
+  { label: t('lastDonation'), value: 'July 15, 2025' },
   { label: t('donorStatus'), value: t('goldDonor') },
-  { label: t('nextEligible'), value: 'October 20, 2024' },
+  { label: t('nextEligible'), value: 'October 20, 2025' },
 ];
 
 export default function ProfileScreen() {

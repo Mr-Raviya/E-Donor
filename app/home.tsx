@@ -88,21 +88,21 @@ const donations = [
     facility: 'Lanka Hospitals',
     caseType: 'Emergency Surgery',
     units: 1,
-    date: '2024-08-15',
+    date: '2025-08-15',
   },
   {
     id: 'd2',
     facility: 'National Blood Centre',
     caseType: 'Cancer Patient',
     units: 1,
-    date: '2024-06-20',
+    date: '2025-06-20',
   },
   {
     id: 'd3',
     facility: 'Nawaloka Hospital',
     caseType: 'Accident Victim',
     units: 1,
-    date: '2024-04-10',
+    date: '2025-04-10',
   },
 ] as const;
 

@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    User,
-    createUserWithEmailAndPassword,
-    signOut as firebaseSignOut,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    updateProfile,
+  User,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  updateProfile,
 } from 'firebase/auth';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
@@ -54,6 +54,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdminAccount, setIsAdminAccount] = useState(false);
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
+  const clearDeactivationMessage = useCallback(() => setDeactivationMessage(null), []);
 
   const cacheUserLocally = useCallback(async (profile: UserProfile) => {
     try {
@@ -263,6 +264,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         loading,
+        deactivationMessage,
+        clearDeactivationMessage,
         refreshProfile,
         updateUser,
         updateProfilePicture,

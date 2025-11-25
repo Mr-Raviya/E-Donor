@@ -13,7 +13,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
 
@@ -31,6 +31,7 @@ export default function AdminSettings() {
   const router = useRouter();
   const { admin, logout } = useAdmin();
   const { themeMode, setThemeMode } = useAppearance();
+  const insets = useSafeAreaInsets();
 
   const [settings, setSettings] = useState({
     emailNotifications: true,
@@ -218,7 +219,10 @@ export default function AdminSettings() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: themeMode === 'dark' ? '#1a1a1a' : '#f5f5f5' }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: themeMode === 'dark' ? '#1a1a1a' : '#f5f5f5' }]}
+      edges={['top']}
+    >
       <View style={[styles.header, { 
         backgroundColor: themeMode === 'dark' ? '#2a2a2a' : '#fff',
         borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#e0e0e0'
@@ -232,7 +236,7 @@ export default function AdminSettings() {
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}

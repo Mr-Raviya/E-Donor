@@ -14,7 +14,7 @@ import {
     View,
     ActivityIndicator
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendNotification, listenToAdminNotifications } from './services/notificationService';
 import { auth } from '../lib/firebase';
 
@@ -64,7 +64,7 @@ const initialNotifications: Notification[] = [
     message: 'Critical shortage of O- blood. Multiple patients in need.',
     type: 'urgent',
     targetAudience: 'donors',
-    sentDate: '2024-11-16',
+    sentDate: '2025-11-16',
     sentBy: 'Admin',
     readCount: 456,
     totalSent: 678,
@@ -75,7 +75,7 @@ const initialNotifications: Notification[] = [
     message: 'Join us at City Park for our community blood drive on Saturday.',
     type: 'event',
     targetAudience: 'all',
-    sentDate: '2024-11-15',
+    sentDate: '2025-11-15',
     sentBy: 'Admin',
     readCount: 892,
     totalSent: 1247,
@@ -84,6 +84,7 @@ const initialNotifications: Notification[] = [
 
 export default function AdminNotifications() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<typeof notificationTemplates[0] | null>(null);
@@ -209,7 +210,7 @@ export default function AdminNotifications() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1a1a1a" />
@@ -245,7 +246,7 @@ export default function AdminNotifications() {
           data={notifications}
           renderItem={renderNotification}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <Text style={styles.sectionTitle}>Notification History</Text>
