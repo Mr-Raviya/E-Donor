@@ -1,21 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createHospitalAuthAccount, createHospitalProfile, deleteHospitalProfile, linkHospitalUserRecord, listHospitals, sendHospitalCredentialsEmail, updateHospitalProfile } from './services/hospitalService';
+import { createHospitalAuthAccount, createHospitalProfile, deleteHospitalProfile, linkHospitalUserRecord, listHospitals, updateHospitalProfile } from './services/hospitalService';
 import { HospitalProfile } from './types/hospital';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
@@ -60,6 +66,9 @@ export default function AdminHospitals() {
   const [generatedPassword, setGeneratedPassword] = useState(generateRandomPassword());
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState({ email: '', password: '', name: '' });
+  const [copied, setCopied] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -161,26 +170,15 @@ export default function AdminHospitals() {
         });
       }
 
-      let emailSent = false;
-      try {
-        await sendHospitalCredentialsEmail({
-          hospitalName: trimmed.name,
-          email: trimmed.email,
-          password: passwordToSend,
-        });
-        emailSent = true;
-      } catch (emailError) {
-        console.error('Failed to send hospital credentials email', emailError);
-      }
-
-      if (emailSent) {
-        Alert.alert('Success', 'Hospital profile added and credentials emailed to the hospital.');
-      } else {
-        Alert.alert(
-          'Hospital added',
-          `Profile saved, but the password email could not be sent. Share this temporary password with the hospital:\n${passwordToSend}`,
-        );
-      }
+      // Show password popup for admin to copy and share
+      setSavedCredentials({
+        email: trimmed.email,
+        password: passwordToSend,
+        name: trimmed.name,
+      });
+      setCopied(false);
+      setShowPasswordModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Failed to add hospital', error);
       Alert.alert('Error', 'Could not save hospital profile. Please try again.');
@@ -350,16 +348,24 @@ export default function AdminHospitals() {
       )}
 
       <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create Hospital Profile</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={28} color="#1a1a1a" />
-              </TouchableOpacity>
-            </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Create Hospital Profile</Text>
+                <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                  <Ionicons name="close" size={28} color="#1a1a1a" />
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionHeading}>Basic Information</Text>
                 <View style={styles.formGroupInline}>
@@ -369,7 +375,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.name}
                       onChangeText={(text) => setNewHospital({ ...newHospital, name: text })}
-                      placeholder="City General Hospital"
+                      placeholder="Enter Hospital Name"
                       placeholderTextColor="#999"
                     />
                   </View>
@@ -381,7 +387,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.email}
                       onChangeText={(text) => setNewHospital({ ...newHospital, email: text })}
-                      placeholder="admin@hospital.com"
+                      placeholder="Enter Email Address"
                       keyboardType="email-address"
                       autoCapitalize="none"
                       placeholderTextColor="#999"
@@ -393,7 +399,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.phone}
                       onChangeText={(text) => setNewHospital({ ...newHospital, phone: text })}
-                      placeholder="+94 11 222 3333"
+                      placeholder="Enter Phone Number"
                       keyboardType="phone-pad"
                       placeholderTextColor="#999"
                     />
@@ -410,7 +416,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.street}
                       onChangeText={(text) => setNewHospital({ ...newHospital, street: text })}
-                      placeholder="123 Medical Center Drive"
+                      placeholder="Enter Street Address"
                       placeholderTextColor="#999"
                     />
                   </View>
@@ -422,7 +428,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.city}
                       onChangeText={(text) => setNewHospital({ ...newHospital, city: text })}
-                      placeholder="Colombo"
+                      placeholder="Enter City"
                       placeholderTextColor="#999"
                     />
                   </View>
@@ -432,7 +438,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.state}
                       onChangeText={(text) => setNewHospital({ ...newHospital, state: text })}
-                      placeholder="Western"
+                      placeholder="Enter State"
                       placeholderTextColor="#999"
                     />
                   </View>
@@ -444,7 +450,7 @@ export default function AdminHospitals() {
                       style={styles.input}
                       value={newHospital.zipCode}
                       onChangeText={(text) => setNewHospital({ ...newHospital, zipCode: text })}
-                      placeholder="01000"
+                      placeholder="Enter Zip Code"
                       keyboardType="numeric"
                       placeholderTextColor="#999"
                     />
@@ -505,6 +511,67 @@ export default function AdminHospitals() {
                 </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Password Success Modal */}
+      <Modal
+        visible={showPasswordModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.passwordModalOverlay}>
+          <View style={styles.passwordModalCard}>
+            <View style={styles.passwordModalIconContainer}>
+              <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+            </View>
+            <Text style={styles.passwordModalTitle}>Hospital Added!</Text>
+            <Text style={styles.passwordModalMessage}>
+              Share these credentials with the hospital administrator:
+            </Text>
+            
+            <View style={styles.credentialsContainer}>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Email:</Text>
+                <Text style={styles.credentialValue}>{savedCredentials.email}</Text>
+              </View>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Temporary Password:</Text>
+                <View style={styles.passwordDisplayRow}>
+                  <Text style={styles.passwordValue}>{savedCredentials.password}</Text>
+                  <TouchableOpacity
+                    style={styles.copyButton}
+                    onPress={async () => {
+                      await Clipboard.setStringAsync(savedCredentials.password);
+                      setCopied(true);
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                  >
+                    <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={copied ? '#10B981' : '#DC143C'} />
+                    <Text style={[styles.copyButtonText, copied && { color: '#10B981' }]}>
+                      {copied ? 'Copied!' : 'Copy'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.passwordModalNote}>
+              Please save this password securely. The hospital will need it to log in for the first time.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.passwordModalButton}
+              onPress={() => {
+                setShowPasswordModal(false);
+                setCopied(false);
+              }}
+            >
+              <Text style={styles.passwordModalButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -833,5 +900,114 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  passwordModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  passwordModalCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 32,
+    backgroundColor: 'white',
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    elevation: 15,
+  },
+  passwordModalIconContainer: {
+    marginBottom: 16,
+  },
+  passwordModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  passwordModalMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  credentialsContainer: {
+    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  credentialRow: {
+    marginBottom: 12,
+  },
+  credentialLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  credentialValue: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  passwordDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  passwordValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#DC143C',
+    letterSpacing: 1,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    gap: 4,
+  },
+  copyButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC143C',
+  },
+  passwordModalNote: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  passwordModalButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  passwordModalButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
   },
 });

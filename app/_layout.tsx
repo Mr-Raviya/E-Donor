@@ -27,7 +27,7 @@ export default function RootLayout() {
                 <Stack.Screen name="onboarding" />
                 <Stack.Screen name="sign-in" />
                 <Stack.Screen name="sign-up" />
-                <Stack.Screen name="home" />
+                <Stack.Screen name="home" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="profile" />
                 <Stack.Screen name="edit-profile" />
                 <Stack.Screen name="chat" />
@@ -35,7 +35,7 @@ export default function RootLayout() {
                 <Stack.Screen name="settingspanel" />
                 <Stack.Screen name="request-detail" />
                 <Stack.Screen name="admin-login" />
-                <Stack.Screen name="admin-dashboard" />
+                <Stack.Screen name="admin-dashboard" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="admin-users" />
                 <Stack.Screen name="admin-hospitals" />
                 <Stack.Screen name="admin-inventory" />

@@ -7,7 +7,7 @@ This document provides instructions for setting up and using the E-Donor admin p
 **Email:** admin@gmail.com  
 **Password:** admin
 
-## Installation
+# Installation
 
 1. Install dependencies:
    ```bash

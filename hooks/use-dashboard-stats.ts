@@ -26,8 +26,8 @@ export function useDashboardStats(): DashboardStats {
   });
 
   useEffect(() => {
-    // Real-time listener for users count
-    const usersQuery = query(collection(db, 'users'));
+    // Real-time listener for users count (profiles collection)
+    const usersQuery = query(collection(db, 'profiles'));
     const unsubscribeUsers = onSnapshot(
       usersQuery,
       (snapshot) => {

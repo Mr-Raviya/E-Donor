@@ -1,27 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../lib/firebase';
 import {
-  createAdminUserProfile,
-  deleteAdminUserProfile,
-  listUserProfiles,
-  updateAdminUserProfile,
+    deleteAdminUserProfile,
+    listUserProfiles,
+    updateAdminUserProfile,
+    upsertUserProfile
 } from './services/profileService';
 import { UserProfile } from './types/user';
+
+const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
+const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,12}$/;
 
 interface User {
   id: string;
@@ -63,7 +75,25 @@ export default function AdminUsers() {
     email: '',
     phone: '',
     bloodType: 'A+',
+    password: '',
+    confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState({ email: '', password: '', name: '' });
+  const [copied, setCopied] = useState(false);
+
+  // Password validation checks
+  const passwordChecks = {
+    length: newUser.password.length >= 6 && newUser.password.length <= 12,
+    lowercase: /[a-z]/.test(newUser.password),
+    uppercase: /[A-Z]/.test(newUser.password),
+    number: /\d/.test(newUser.password),
+    special: /[^A-Za-z0-9]/.test(newUser.password),
+    match: newUser.password === newUser.confirmPassword && newUser.confirmPassword.length > 0,
+  };
+  const isPasswordValid = passwordPattern.test(newUser.password) && passwordChecks.match;
 
   const normalizeAndSetUsers = useCallback((profiles: UserProfile[]) => {
     setUsers(
@@ -110,21 +140,64 @@ export default function AdminUsers() {
       return;
     }
 
+    if (!emailPattern.test(newUser.email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (!isPasswordValid) {
+      Alert.alert('Error', 'Please ensure password meets all requirements and passwords match');
+      return;
+    }
+
     try {
       setCreatingUser(true);
-      const createdUser = await createAdminUserProfile({
+      
+      // Create Firebase Auth account
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        newUser.email.trim(),
+        newUser.password
+      );
+      
+      const userId = userCredential.user.uid;
+      
+      // Create user profile in Firestore
+      const createdUser = await upsertUserProfile(userId, {
         name: newUser.name.trim(),
         email: newUser.email.trim(),
         phone: newUser.phone.trim(),
         bloodType: newUser.bloodType,
+        status: 'active',
+        donationCount: 0,
+        joinedDate: new Date().toISOString(),
       });
+      
       setUsers((prev) => [...prev, normalizeProfileToUser(createdUser)]);
       setShowAddModal(false);
-      setNewUser({ name: '', email: '', phone: '', bloodType: 'A+' });
-      Alert.alert('Success', 'User added successfully');
-    } catch (error) {
+      
+      // Show password success modal
+      setSavedCredentials({
+        email: newUser.email.trim(),
+        password: newUser.password,
+        name: newUser.name.trim(),
+      });
+      setCopied(false);
+      setShowPasswordModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      setNewUser({ name: '', email: '', phone: '', bloodType: 'A+', password: '', confirmPassword: '' });
+    } catch (error: any) {
       console.error('Failed to add user:', error);
-      Alert.alert('Error', 'Unable to add user. Please try again.');
+      let errorMessage = 'Unable to add user. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak.';
+      }
+      Alert.alert('Error', errorMessage);
     } finally {
       setCreatingUser(false);
     }
@@ -331,89 +404,283 @@ export default function AdminUsers() {
 
       {/* Add User Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New User</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={28} color="#1a1a1a" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                value={newUser.name}
-                onChangeText={(text) => setNewUser({ ...newUser, name: text })}
-                placeholder="Enter full name"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                value={newUser.email}
-                onChangeText={(text) => setNewUser({ ...newUser, email: text })}
-                placeholder="Enter email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                value={newUser.phone}
-                onChangeText={(text) => setNewUser({ ...newUser, phone: text })}
-                placeholder="Enter phone number"
-                keyboardType="phone-pad"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Blood Type</Text>
-              <View style={styles.bloodTypeSelector}>
-                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.bloodTypeButton,
-                      newUser.bloodType === type && styles.bloodTypeButtonActive,
-                    ]}
-                    onPress={() => setNewUser({ ...newUser, bloodType: type })}
-                  >
-                    <Text
-                      style={[
-                        styles.bloodTypeText,
-                        newUser.bloodType === type && styles.bloodTypeTextActive,
-                      ]}
-                    >
-                      {type}
-                    </Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Add New User</Text>
+                  <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                    <Ionicons name="close" size={28} color="#1a1a1a" />
                   </TouchableOpacity>
-                ))}
+                </View>
+
+                <ScrollView 
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                >
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Full Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={newUser.name}
+                      onChangeText={(text) => setNewUser({ ...newUser, name: text })}
+                      placeholder="Enter full name"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={newUser.email}
+                      onChangeText={(text) => setNewUser({ ...newUser, email: text })}
+                      placeholder="Enter email"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Phone</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={newUser.phone}
+                      onChangeText={(text) => setNewUser({ ...newUser, phone: text })}
+                      placeholder="Enter phone number"
+                      keyboardType="phone-pad"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Blood Type</Text>
+                    <View style={styles.bloodTypeSelector}>
+                      {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.bloodTypeButton,
+                            newUser.bloodType === type && styles.bloodTypeButtonActive,
+                          ]}
+                          onPress={() => setNewUser({ ...newUser, bloodType: type })}
+                        >
+                          <Text
+                            style={[
+                              styles.bloodTypeText,
+                              newUser.bloodType === type && styles.bloodTypeTextActive,
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Password</Text>
+                    <View style={styles.passwordInputContainer}>
+                      <TextInput
+                        style={styles.passwordInput}
+                        value={newUser.password}
+                        onChangeText={(text) => setNewUser({ ...newUser, password: text })}
+                        placeholder="Enter password"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeIcon}
+                        onPress={() => setShowPassword(!showPassword)}
+                      >
+                        <Ionicons
+                          name={showPassword ? 'eye-off' : 'eye'}
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Confirm Password</Text>
+                    <View style={styles.passwordInputContainer}>
+                      <TextInput
+                        style={styles.passwordInput}
+                        value={newUser.confirmPassword}
+                        onChangeText={(text) => setNewUser({ ...newUser, confirmPassword: text })}
+                        placeholder="Confirm password"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!showConfirmPassword}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeIcon}
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        <Ionicons
+                          name={showConfirmPassword ? 'eye-off' : 'eye'}
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Password Requirements */}
+                  <View style={styles.passwordRequirements}>
+                    <Text style={styles.requirementsTitle}>Password Requirements:</Text>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.length ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.length ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.length && styles.requirementMet]}>
+                        6-12 characters
+                      </Text>
+                    </View>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.lowercase ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.lowercase ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.lowercase && styles.requirementMet]}>
+                        One lowercase letter
+                      </Text>
+                    </View>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.uppercase ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.uppercase ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.uppercase && styles.requirementMet]}>
+                        One uppercase letter
+                      </Text>
+                    </View>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.number ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.number ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.number && styles.requirementMet]}>
+                        One number
+                      </Text>
+                    </View>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.special ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.special ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.special && styles.requirementMet]}>
+                        One special character
+                      </Text>
+                    </View>
+                    <View style={styles.requirementRow}>
+                      <Ionicons
+                        name={passwordChecks.match ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={passwordChecks.match ? '#28a745' : '#999'}
+                      />
+                      <Text style={[styles.requirementText, passwordChecks.match && styles.requirementMet]}>
+                        Passwords match
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.submitButton, (creatingUser || !isPasswordValid) && styles.submitButtonDisabled]}
+                    onPress={handleAddUser}
+                    disabled={creatingUser || !isPasswordValid}
+                  >
+                    <LinearGradient colors={['#DC143C', '#8B0000']} style={styles.submitGradient}>
+                      {creatingUser ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.submitText}>Add User</Text>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Password Success Modal */}
+      <Modal 
+        visible={showPasswordModal} 
+        animationType="fade" 
+        transparent
+        onRequestClose={() => {
+          setShowPasswordModal(false);
+          setSavedCredentials(null);
+          setCopied(false);
+        }}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalCard}>
+            <Ionicons name="checkmark-circle" size={56} color="#10B981" style={{ marginBottom: 16 }} />
+            <Text style={styles.successModalTitle}>User Created Successfully!</Text>
+            <Text style={styles.successModalMessage}>
+              Share these credentials with {savedCredentials?.name}
+            </Text>
+
+            <View style={styles.credentialBox}>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Email</Text>
+                <Text style={styles.credentialValue}>{savedCredentials?.email}</Text>
+              </View>
+              <View style={styles.credentialDivider} />
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Password</Text>
+                <Text style={styles.credentialValue}>{savedCredentials?.password}</Text>
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.submitButton, creatingUser && styles.submitButtonDisabled]}
-              onPress={handleAddUser}
-              disabled={creatingUser}
-            >
-              <LinearGradient colors={['#DC143C', '#8B0000']} style={styles.submitGradient}>
-                {creatingUser ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitText}>Add User</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={styles.successModalButtonRow}>
+              <TouchableOpacity
+                style={[styles.successModalButton, styles.copyModalButton]}
+                onPress={async () => {
+                  await Clipboard.setStringAsync(
+                    `Email: ${savedCredentials?.email}\nPassword: ${savedCredentials?.password}`
+                  );
+                  setCopied(true);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }}
+                activeOpacity={0.9}
+              >
+                <Ionicons
+                  name={copied ? 'checkmark-circle' : 'copy-outline'}
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.copyModalButtonText}>
+                  {copied ? 'Copied!' : 'Copy'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.successModalButton, styles.doneModalButton]}
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setSavedCredentials(null);
+                  setCopied(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.doneModalButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -718,7 +985,8 @@ const styles = StyleSheet.create({
     color: '#DC143C',
   },
   submitButton: {
-    marginTop: 8,
+    marginTop: 16,
+    marginBottom: 4,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -763,5 +1031,153 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  eyeIcon: {
+    padding: 14,
+  },
+  passwordRequirements: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  requirementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  requirementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  requirementText: {
+    fontSize: 13,
+    color: '#999',
+  },
+  requirementMet: {
+    color: '#28a745',
+    fontWeight: '500',
+  },
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  successModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 32,
+    backgroundColor: 'white',
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    elevation: 15,
+  },
+  successModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successModalMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  credentialBox: {
+    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  credentialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  credentialDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  credentialLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  credentialValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  successModalButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  successModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  copyModalButton: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  doneModalButton: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: 'white',
+  },
+  copyModalButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'white',
+  },
+  doneModalButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
   },
 });

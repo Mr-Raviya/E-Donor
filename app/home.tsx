@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    BackHandler,
     Image,
     ScrollView,
     StyleSheet,
@@ -115,6 +116,16 @@ export default function HomeScreen() {
   const activeCount = useMemo(() => requests.length, []);
   const router = useRouter();
   const unreadCount = useUnreadNotifications();
+
+  // Prevent back navigation to onboarding/sign-in screens
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Return true to prevent default back behavior
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, []);
 
   const styles = createStyles(isDark, locale);
 
