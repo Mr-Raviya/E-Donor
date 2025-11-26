@@ -21,6 +21,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHaptics } from './contexts/HapticsContext';
 import { createHospitalAuthAccount, createHospitalProfile, deleteHospitalProfile, linkHospitalUserRecord, listHospitals, updateHospitalProfile } from './services/hospitalService';
 import { HospitalProfile } from './types/hospital';
 
@@ -70,6 +71,7 @@ export default function AdminHospitals() {
   const [savedCredentials, setSavedCredentials] = useState({ email: '', password: '', name: '' });
   const [copied, setCopied] = useState(false);
   const insets = useSafeAreaInsets();
+  const { notification } = useHaptics();
 
   useEffect(() => {
     const loadHospitals = async () => {
@@ -178,7 +180,7 @@ export default function AdminHospitals() {
       });
       setCopied(false);
       setShowPasswordModal(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notification(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Failed to add hospital', error);
       Alert.alert('Error', 'Could not save hospital profile. Please try again.');
@@ -547,7 +549,7 @@ export default function AdminHospitals() {
                     onPress={async () => {
                       await Clipboard.setStringAsync(savedCredentials.password);
                       setCopied(true);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      await notification(Haptics.NotificationFeedbackType.Success);
                     }}
                   >
                     <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={copied ? '#10B981' : '#DC143C'} />

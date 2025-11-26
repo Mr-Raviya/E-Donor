@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -17,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDashboardStats } from '../hooks/use-dashboard-stats';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -87,6 +88,7 @@ export default function AdminDashboard() {
   const isDark = themeMode === 'dark';
   const insets = useSafeAreaInsets();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const { impact, notification } = useHaptics();
   
   // Prevent back navigation to sign-in screen
   useEffect(() => {
@@ -115,12 +117,12 @@ export default function AdminDashboard() {
   );
 
   const handleLogout = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impact(Haptics.ImpactFeedbackStyle.Medium);
     setLogoutModalVisible(true);
   };
 
   const confirmLogout = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await notification(Haptics.NotificationFeedbackType.Success);
     await logout();
     setLogoutModalVisible(false);
     router.replace('/sign-in');

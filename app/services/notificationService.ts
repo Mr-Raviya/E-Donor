@@ -493,3 +493,6 @@ export const listenToAdminNotifications = (
     throw error;
   }
 };
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

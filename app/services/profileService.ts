@@ -151,3 +151,6 @@ export const updateAdminUserProfile = async (
 export const deleteAdminUserProfile = async (userId: string): Promise<void> => {
   await deleteDoc(doc(db, COLLECTION, userId));
 };
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

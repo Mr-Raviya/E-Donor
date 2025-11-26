@@ -10,10 +10,11 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
 
@@ -99,6 +100,7 @@ export default function ProfileScreen() {
   const { t } = useLocalization();
   const { themeMode } = useAppearance();
   const { user, session } = useUser();
+  const { impact, notification } = useHaptics();
   const isDark = themeMode === 'dark';
   const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
   const [donorStatusModalVisible, setDonorStatusModalVisible] = React.useState(false);
@@ -237,7 +239,7 @@ export default function ProfileScreen() {
                       backgroundColor: isDark ? levelColors.bgDark : levelColors.bg 
                     }]}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      impact(Haptics.ImpactFeedbackStyle.Light);
                       setDonorStatusModalVisible(true);
                     }}
                     activeOpacity={0.7}
@@ -281,7 +283,7 @@ export default function ProfileScreen() {
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          impact(Haptics.ImpactFeedbackStyle.Medium);
           setLogoutModalVisible(true);
         }}>
           <LinearGradient
@@ -412,7 +414,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalPrimaryButton]}
                 onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  notification(Haptics.NotificationFeedbackType.Success);
                   setLogoutModalVisible(false);
                   router.replace('/sign-in');
                 }}

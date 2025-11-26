@@ -1,6 +1,12 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  getReactNativePersistence,
+  initializeAuth,
+} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 
 const extra = (Constants.expoConfig as any)?.extra ?? (Constants.manifest as any)?.extra ?? {};
@@ -22,5 +28,20 @@ if (!firebaseConfig.apiKey) {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// Ensure React Native persistence uses AsyncStorage to avoid memory-only auth
+let auth;
+if (Platform.OS !== 'web') {
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error) {
+    // initializeAuth may throw if already initialized; fall back to existing instance
+    auth = getAuth(app);
+  }
+} else {
+  auth = getAuth(app);
+}
+
+export { auth };
 export const db = getFirestore(app);

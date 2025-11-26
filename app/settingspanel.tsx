@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
 
@@ -43,6 +44,7 @@ export default function SettingsPanel() {
   const { locale, setLocale, t } = useLocalization();
   const { themeMode, setThemeMode } = useAppearance();
   const { user } = useUser();
+  const { enabled: hapticsEnabled, setEnabled: setHapticsEnabled, impact, notification } = useHaptics();
 
   // Notification settings
   const [donationRequests, setDonationRequests] = useState(true);
@@ -50,9 +52,6 @@ export default function SettingsPanel() {
   const [reminders, setReminders] = useState(false);
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(true);
-
-  // Accessibility
-  const [haptics, setHaptics] = useState(true);
 
   // Privacy
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -68,7 +67,7 @@ export default function SettingsPanel() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChangePassword = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impact(Haptics.ImpactFeedbackStyle.Medium);
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
@@ -114,7 +113,7 @@ export default function SettingsPanel() {
       // Update password
       await updatePassword(currentUser, newPassword);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notification(Haptics.NotificationFeedbackType.Success);
       setChangePasswordModalVisible(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -126,7 +125,7 @@ export default function SettingsPanel() {
         [{ text: 'OK' }]
       );
     } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await notification(Haptics.NotificationFeedbackType.Error);
       let errorMessage = 'Failed to change password. Please try again.';
       
       if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
@@ -146,12 +145,12 @@ export default function SettingsPanel() {
   };
 
   const handleLogout = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impact(Haptics.ImpactFeedbackStyle.Medium);
     setLogoutModalVisible(true);
   };
 
   const confirmLogout = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notification(Haptics.NotificationFeedbackType.Success);
     setLogoutModalVisible(false);
     router.replace('/sign-in');
   };
@@ -250,8 +249,8 @@ export default function SettingsPanel() {
       subtitle: 'Haptic feedback',
       icon: 'hand-left',
       type: 'toggle',
-      value: haptics,
-      action: () => setHaptics(!haptics),
+      value: hapticsEnabled,
+      action: () => void setHapticsEnabled(!hapticsEnabled),
     },
   ];
 

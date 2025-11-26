@@ -204,3 +204,6 @@ export const sendHospitalCredentialsEmail = async ({
     createdAt: new Date().toISOString(),
   });
 };
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

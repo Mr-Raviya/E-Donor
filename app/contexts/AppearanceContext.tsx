@@ -56,3 +56,8 @@ export function useAppearance() {
   }
   return context;
 }
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default function IgnoreAppearanceRoute() {
+  return null;
+}

@@ -231,14 +231,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!firebaseUser.emailVerified) {
-          try {
-            await sendEmailVerification(firebaseUser);
-          } catch (verificationError) {
-            console.error('Failed to send verification email on sign in:', verificationError);
-          }
           await firebaseSignOut(auth);
           const verificationError: any = new Error(
-            'Please verify your email before signing in. We sent a verification link to your inbox.',
+            'Please verify your email before signing in. Tap "Resend Verification Email" to get a new link.',
           );
           verificationError.code = 'auth/email-not-verified';
           throw verificationError;
@@ -353,4 +348,9 @@ export function useUser() {
     throw new Error('useUser must be used within UserProvider');
   }
   return context;
+}
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default function IgnoreUserRoute() {
+  return null;
 }

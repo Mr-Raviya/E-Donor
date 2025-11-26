@@ -41,3 +41,6 @@ export const isAdminUser = async (userId: string): Promise<boolean> => {
   const record = await fetchAdminRecord(userId);
   return record !== null;
 };
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

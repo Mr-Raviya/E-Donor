@@ -13,3 +13,6 @@ export interface UserProfile {
   joinedDate?: string;
   donationCount?: number;
 }
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

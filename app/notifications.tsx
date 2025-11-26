@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import {
     clearAllUserNotifications,
@@ -46,6 +47,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const { impact } = useHaptics();
 
   const styles = createStyles(isDark);
 
@@ -136,7 +138,7 @@ export default function NotificationsScreen() {
     if (!currentUser) return;
 
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      impact(Haptics.ImpactFeedbackStyle.Medium);
       await clearAllUserNotifications(currentUser.uid);
       setNotifications([]);
     } catch (error) {
@@ -175,7 +177,7 @@ export default function NotificationsScreen() {
 
   // Open notification detail modal
   const openNotificationDetail = async (notification: NotificationItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impact(Haptics.ImpactFeedbackStyle.Light);
     setSelectedNotification(notification);
     setModalVisible(true);
     
@@ -187,7 +189,7 @@ export default function NotificationsScreen() {
 
   // Close notification detail modal
   const closeNotificationDetail = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impact(Haptics.ImpactFeedbackStyle.Light);
     setModalVisible(false);
     setSelectedNotification(null);
   };

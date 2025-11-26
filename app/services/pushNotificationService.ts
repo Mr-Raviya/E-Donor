@@ -181,3 +181,6 @@ export async function clearAllNotifications(): Promise<void> {
     console.error('Error clearing notifications:', error);
   }
 }
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

@@ -23,6 +23,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHaptics } from './contexts/HapticsContext';
 import { auth } from '../lib/firebase';
 import {
     deleteAdminUserProfile,
@@ -97,6 +98,7 @@ export default function AdminUsers() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState({ email: '', password: '', name: '' });
   const [copied, setCopied] = useState(false);
+  const { impact, notification } = useHaptics();
 
   // Password validation checks
   const passwordChecks = {
@@ -198,7 +200,7 @@ export default function AdminUsers() {
       });
       setCopied(false);
       setShowPasswordModal(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notification(Haptics.NotificationFeedbackType.Success);
       
       setNewUser({ name: '', email: '', phone: '', bloodType: 'A+', password: '', confirmPassword: '' });
     } catch (error: any) {
@@ -263,7 +265,7 @@ export default function AdminUsers() {
   };
 
   const openDonorLevelModal = (user: User) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impact(Haptics.ImpactFeedbackStyle.Light);
     setSelectedUserForLevel(user);
     setShowDonorLevelModal(true);
   };
@@ -279,7 +281,7 @@ export default function AdminUsers() {
           existingUser.id === selectedUserForLevel.id ? normalizeProfileToUser(updatedUser) : existingUser,
         ),
       );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notification(Haptics.NotificationFeedbackType.Success);
       setShowDonorLevelModal(false);
       setSelectedUserForLevel(null);
     } catch (error) {
@@ -709,7 +711,7 @@ export default function AdminUsers() {
                     `Email: ${savedCredentials?.email}\nPassword: ${savedCredentials?.password}`
                   );
                   setCopied(true);
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  await notification(Haptics.NotificationFeedbackType.Success);
                 }}
                 activeOpacity={0.9}
               >

@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUnreadNotifications } from '../hooks/use-unread-notifications';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
 import { DonationRequest, listenToDonationRequests } from './services/donationRequestService';
@@ -197,6 +198,7 @@ export default function HomeScreen() {
   const activeCount = useMemo(() => requestCards.length, [requestCards]);
   const router = useRouter();
   const unreadCount = useUnreadNotifications();
+  const { impact } = useHaptics();
   
   // Get donor level config
   const donorLevel = getDonorLevel(user.donorLevel);
@@ -387,7 +389,7 @@ export default function HomeScreen() {
             style={styles.statCard} 
             activeOpacity={0.9}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              impact(Haptics.ImpactFeedbackStyle.Light);
               setDonorStatusModalVisible(true);
             }}
           >

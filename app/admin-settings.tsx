@@ -9,12 +9,13 @@ import {
     StyleSheet,
     Switch,
     Text,
-    TouchableOpacity,
-    View
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdmin } from './contexts/AdminContext';
 import { useAppearance } from './contexts/AppearanceContext';
+import { useHaptics } from './contexts/HapticsContext';
 
 interface SettingItem {
   id: string;
@@ -31,6 +32,7 @@ export default function AdminSettings() {
   const { admin, logout } = useAdmin();
   const { themeMode, setThemeMode } = useAppearance();
   const insets = useSafeAreaInsets();
+  const { impact, notification } = useHaptics();
 
   const [settings, setSettings] = useState({
     emailNotifications: true,
@@ -46,12 +48,12 @@ export default function AdminSettings() {
   };
 
   const handleLogout = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impact(Haptics.ImpactFeedbackStyle.Medium);
     setLogoutModalVisible(true);
   };
 
   const confirmLogout = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await notification(Haptics.NotificationFeedbackType.Success);
     setLogoutModalVisible(false);
     await logout();
     router.replace('/sign-in');

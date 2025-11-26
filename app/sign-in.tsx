@@ -28,6 +28,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
 import { useAdmin } from './contexts/AdminContext';
+import { useHaptics } from './contexts/HapticsContext';
 import { useUser } from './contexts/UserContext';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
@@ -60,12 +61,14 @@ export default function SignInScreen() {
   );
   const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [resetSuccessVisible, setResetSuccessVisible] = useState(false);
+  const [verificationSuccessVisible, setVerificationSuccessVisible] = useState(false);
   const signInShake = useRef(new Animated.Value(0)).current;
   const resetShake = useRef(new Animated.Value(0)).current;
   const resetModalTranslate = useRef(new Animated.Value(RESET_MODAL_OFFSCREEN)).current;
+  const { notification } = useHaptics();
 
   const triggerShake = (value: Animated.Value) => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    void notification(Haptics.NotificationFeedbackType.Error);
     value.setValue(0);
     Animated.sequence([
       Animated.timing(value, { toValue: 8, duration: 60, useNativeDriver: true }),
@@ -133,7 +136,7 @@ export default function SignInScreen() {
         setErrorMessage('Please check your internet connection and try again.');
       } else if (errorCode === 'auth/email-not-verified' || normalizedMessage.includes('verify your email')) {
         setErrorMessage(
-          'Please verify your email to continue. We just sent a verification link to your inbox.',
+          'Please verify your email to continue. Tap "Resend Verification Email" to get a new link.',
         );
       } else if (normalizedMessage.includes('deactivated')) {
         setErrorMessage('Your account has been deactivated. Please contact support for assistance.');
@@ -164,13 +167,14 @@ export default function SignInScreen() {
     
     try {
       await resendVerificationEmail(trimmedEmail, trimmedPassword);
-      setVerificationSentMessage('Verification link resent. Please check your inbox.');
+      closeErrorModal();
       setVerificationCooldown(60);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setVerificationSuccessVisible(true);
+      void notification(Haptics.NotificationFeedbackType.Success);
     } catch (resendError) {
       console.error('Failed to resend verification email:', resendError);
       setVerificationSentMessage('Unable to resend verification email. Please try again.');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      void notification(Haptics.NotificationFeedbackType.Error);
     } finally {
       setResendingVerification(false);
     }
@@ -196,7 +200,7 @@ export default function SignInScreen() {
     
     try {
       await sendPasswordResetEmail(auth, trimmedEmail);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notification(Haptics.NotificationFeedbackType.Success);
       setResetSubmitting(false);
       // Close forgot modal and show success modal after animation completes
       Keyboard.dismiss();
@@ -217,7 +221,7 @@ export default function SignInScreen() {
       });
     } catch (error: any) {
       setResetSubmitting(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await notification(Haptics.NotificationFeedbackType.Error);
       
       let errorMsg = 'Failed to send reset email. Please try again.';
       if (error.code === 'auth/user-not-found') {
@@ -482,6 +486,14 @@ export default function SignInScreen() {
         >
           <View style={styles.authErrorOverlay}>
             <View style={styles.authErrorCard}>
+              <TouchableOpacity
+                accessibilityLabel="Close"
+                style={styles.authErrorCloseButton}
+                onPress={closeErrorModal}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
               <Ionicons name="alert-circle" size={40} color="#DC2626" style={{ marginBottom: 12 }} />
               <Text style={styles.authErrorTitle}>Authentication Failed</Text>
               <Text style={styles.authErrorMessage}>{errorMessage}</Text>
@@ -624,6 +636,36 @@ export default function SignInScreen() {
             </View>
           </View>
         </Modal>
+
+        <Modal
+          animationType="fade"
+          transparent
+          visible={verificationSuccessVisible}
+          onRequestClose={() => setVerificationSuccessVisible(false)}
+        >
+          <View style={styles.verificationSuccessOverlay}>
+            <View style={styles.verificationSuccessCard}>
+              <Ionicons
+                name="mail-unread-outline"
+                size={52}
+                color="#10B981"
+                style={{ marginBottom: 12 }}
+              />
+              <Text style={styles.verificationSuccessTitle}>Verification Sent</Text>
+              <Text style={styles.verificationSuccessMessage}>
+                We just sent a new verification link to your email. Please check your inbox to
+                verify your account.
+              </Text>
+              <TouchableOpacity
+                style={styles.verificationSuccessButton}
+                onPress={() => setVerificationSuccessVisible(false)}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.verificationSuccessButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
@@ -684,6 +726,17 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 10,
+  },
+  authErrorCloseButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
   },
   authErrorTitle: {
     fontSize: 20,
@@ -987,6 +1040,58 @@ const styles = StyleSheet.create({
   },
   resetSuccessButtonText: {
     fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+  },
+  verificationSuccessOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  verificationSuccessCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 28,
+    backgroundColor: 'white',
+    padding: 26,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 12,
+  },
+  verificationSuccessTitle: {
+    fontSize: 21,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  verificationSuccessMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  verificationSuccessButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  verificationSuccessButtonText: {
+    fontSize: 15,
     fontWeight: '700',
     color: 'white',
   },

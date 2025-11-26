@@ -395,3 +395,8 @@ export function useLocalization() {
   if (!ctx) throw new Error('useLocalization must be used within LocalizationProvider');
   return ctx;
 }
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default function IgnoreLocalizationRoute() {
+  return null;
+}

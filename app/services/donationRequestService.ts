@@ -124,3 +124,6 @@ export const fetchDonationRequestById = async (id: string): Promise<DonationRequ
   if (!snapshot.exists()) return null;
   return mapSnapshotToDonationRequest(snapshot as QueryDocumentSnapshot<DocumentData>);
 };
+
+// Added to silence Expo Router route warnings; this file is not a screen.
+export default {};

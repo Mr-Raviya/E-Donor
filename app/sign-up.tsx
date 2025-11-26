@@ -22,6 +22,7 @@ import {
     ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHaptics } from './contexts/HapticsContext';
 import { useUser } from './contexts/UserContext';
 
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
@@ -106,9 +107,10 @@ export default function SignUpScreen() {
   const stepsTranslate = useRef(new Animated.Value(0)).current;
   const [currentStep, setCurrentStep] = useState(0);
   const bloodTypeAnim = useRef(new Animated.Value(0)).current;
+  const { notification } = useHaptics();
 
   const triggerShake = (value: Animated.Value) => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    void notification(Haptics.NotificationFeedbackType.Error);
     value.setValue(0);
     Animated.sequence([
       Animated.timing(value, { toValue: 8, duration: 60, useNativeDriver: true }),
