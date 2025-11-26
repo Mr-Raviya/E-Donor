@@ -2,11 +2,14 @@ import {
   collection,
   doc,
   DocumentData,
+  deleteDoc,
   getDoc,
   onSnapshot,
   orderBy,
   query,
   QueryDocumentSnapshot,
+  serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -123,6 +126,22 @@ export const fetchDonationRequestById = async (id: string): Promise<DonationRequ
   const snapshot = await getDoc(doc(donationRequestsCollection, id));
   if (!snapshot.exists()) return null;
   return mapSnapshotToDonationRequest(snapshot as QueryDocumentSnapshot<DocumentData>);
+};
+
+export const updateDonationRequestStatus = async (
+  id: string,
+  status: DonationRequest['status'],
+): Promise<void> => {
+  if (!id) return;
+  await updateDoc(doc(donationRequestsCollection, id), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const deleteDonationRequest = async (id: string): Promise<void> => {
+  if (!id) return;
+  await deleteDoc(doc(donationRequestsCollection, id));
 };
 
 // Added to silence Expo Router route warnings; this file is not a screen.

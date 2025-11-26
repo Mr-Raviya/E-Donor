@@ -62,22 +62,24 @@ export function useDashboardStats(): DashboardStats {
       }
     );
 
-    // Real-time listener for blood requests
-    const requestsQuery = query(collection(db, 'bloodRequests'));
+    // Real-time listener for blood requests (aligned with donation_requests collection used by the app)
+    const requestsQuery = query(collection(db, 'donation_requests'));
     const unsubscribeRequests = onSnapshot(
       requestsQuery,
       (snapshot) => {
         const total = snapshot.size;
-        // Count active requests (you can customize this based on your status field)
-        const active = snapshot.docs.filter(doc => {
-          const status = doc.data().status;
-          return status === 'pending' || status === 'active' || status === 'urgent';
+        // Active = not fulfilled/rejected; fallback to urgency if status missing
+        const active = snapshot.docs.filter((doc) => {
+          const data = doc.data();
+          const status = (data.status ?? 'pending').toString().toLowerCase();
+          if (status === 'fulfilled' || status === 'rejected') return false;
+          return true;
         }).length;
-        
-        setStats((prev) => ({ 
-          ...prev, 
+
+        setStats((prev) => ({
+          ...prev,
           totalRequests: total,
-          activeRequests: active 
+          activeRequests: active,
         }));
       },
       (error) => {

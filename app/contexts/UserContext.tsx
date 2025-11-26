@@ -58,14 +58,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
   const clearDeactivationMessage = useCallback(() => setDeactivationMessage(null), []);
 
-  const cacheUserLocally = useCallback(async (profile: UserProfile) => {
-    try {
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
-    } catch (error) {
-      console.error('Failed to cache user locally:', error);
-    }
-  }, []);
-
   const loadUserFromCache = useCallback(async () => {
     try {
       const savedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
@@ -98,13 +90,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             setUser(defaultUser);
             setSession(null);
             return;
-          }
-          
-          // Profile exists, load it
-          setUser(remoteProfile);
-          await cacheUserLocally(remoteProfile);
-          return;
         }
+        
+        // Profile exists, load it
+        setUser(remoteProfile);
+        return;
+      }
 
         // Create new profile with fallback data (for new users)
         // Merge defaultUser with fallback to ensure all required fields are present
@@ -115,13 +106,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         
         const seededProfile = await upsertUserProfile(userId, profileData);
         setUser(seededProfile);
-        await cacheUserLocally(seededProfile);
       } catch (error) {
         console.error('Failed to sync profile:', error);
         // Don't throw error to avoid uncaught promise rejection
       }
     },
-    [cacheUserLocally],
+    [],
   );
 
   useEffect(() => {
@@ -195,7 +185,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const updatedUser = { ...user, ...updates };
         setUser(updatedUser);
-        await cacheUserLocally(updatedUser);
 
         if (session?.uid) {
           await upsertUserProfile(session.uid, updatedUser);
@@ -205,7 +194,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
     },
-    [cacheUserLocally, session?.uid, user],
+    [session?.uid, user],
   );
 
   const updateProfilePicture = useCallback(

@@ -1,6 +1,7 @@
 import {
     addDoc,
     collection,
+    deleteDoc,
     doc,
     getDoc,
     getDocs,
@@ -332,6 +333,42 @@ export const deleteUserNotification = async (
     console.log('Notification deleted for user:', notificationId);
   } catch (error) {
     console.error('Error deleting notification:', error);
+    throw error;
+  }
+};
+
+/**
+ * Admin: Delete a notification and mark all related user notifications as deleted
+ */
+export const deleteAdminNotification = async (notificationId: string): Promise<void> => {
+  try {
+    // Remove the notification document from the admin collection
+    const notificationRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
+    await deleteDoc(notificationRef);
+
+    // Mark related user notifications as deleted so they disappear from user feeds
+    const relatedUserNotificationsQuery = query(
+      collection(db, USER_NOTIFICATIONS_COLLECTION),
+      where('notificationId', '==', notificationId)
+    );
+    const relatedUserNotifications = await getDocs(relatedUserNotificationsQuery);
+
+    const updates: Promise<any>[] = [];
+    relatedUserNotifications.forEach((document) => {
+      updates.push(
+        updateDoc(doc(db, USER_NOTIFICATIONS_COLLECTION, document.id), {
+          deleted: true,
+          deletedAt: serverTimestamp(),
+        })
+      );
+    });
+
+    await Promise.all(updates);
+    console.log(
+      `Deleted admin notification ${notificationId} and marked ${updates.length} user notifications as deleted`
+    );
+  } catch (error) {
+    console.error('Error deleting admin notification:', error);
     throw error;
   }
 };

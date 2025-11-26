@@ -4,13 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
@@ -18,12 +18,12 @@ import { useAppearance } from './contexts/AppearanceContext';
 import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import {
-    clearAllUserNotifications,
-    deleteUserNotification,
-    listenToUserNotifications,
-    markAllNotificationsAsRead,
-    markNotificationAsRead,
-    UserNotification
+  clearAllUserNotifications,
+  deleteUserNotification,
+  listenToUserNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  UserNotification
 } from './services/notificationService';
 
 type NotificationType = 'critical' | 'urgent' | 'info' | 'success' | 'general' | 'reminder' | 'event';
@@ -47,6 +47,8 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmClearVisible, setConfirmClearVisible] = useState(false);
+  const [confirmMarkAllVisible, setConfirmMarkAllVisible] = useState(false);
   const { impact } = useHaptics();
 
   const styles = createStyles(isDark);
@@ -215,7 +217,7 @@ export default function NotificationsScreen() {
             </View>
           )}
         </View>
-        <TouchableOpacity onPress={markAllRead} style={styles.headerActionBtn}>
+        <TouchableOpacity onPress={() => setConfirmMarkAllVisible(true)} style={styles.headerActionBtn}>
           <Ionicons name="checkmark-done" size={22} color={isDark ? '#fff' : '#1a1a1a'} />
         </TouchableOpacity>
       </View>
@@ -251,20 +253,6 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Clear All Button */}
-      {notifications.length > 0 && (
-        <View style={styles.clearAllContainer}>
-          <TouchableOpacity 
-            style={styles.clearAllButton}
-            onPress={clearAll}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={18} color="#DC2626" />
-            <Text style={styles.clearAllText}>{t('clearAllNotifications')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent} 
@@ -350,6 +338,19 @@ export default function NotificationsScreen() {
         )}
       </ScrollView>
 
+      {/* Floating Clear All Action */}
+      {notifications.length > 0 && (
+        <View style={styles.clearFabContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.clearFab}
+            onPress={() => setConfirmClearVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Notification Detail Modal */}
       <Modal
         animationType="fade"
@@ -394,7 +395,7 @@ export default function NotificationsScreen() {
                     onPress={closeNotificationDetail}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.modalDismissText}>{t('close') || 'Close'}</Text>
+                    <Text style={styles.modalDismissText}>{t('Close') || 'Close'}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -406,11 +407,89 @@ export default function NotificationsScreen() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.modalDeleteText}>{t('delete') || 'Delete'}</Text>
+                    <Text style={styles.modalDeleteText}>{t('Delete') || 'Delete'}</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Clear All Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={confirmClearVisible}
+        onRequestClose={() => setConfirmClearVisible(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconContainer}>
+              <Ionicons name="trash-outline" size={28} color="#DC2626" />
+            </View>
+            <Text style={styles.confirmTitle}>{t('clearAllNotifications')}</Text>
+            <Text style={styles.confirmMessage}>
+              {t('Are you sure you want to clear all notifications?') || 'Are you sure you want to clear all notifications?'}
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                onPress={() => setConfirmClearVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.confirmCancelText}>{t('No') || 'No'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmConfirmBtn}
+                onPress={() => {
+                  clearAll();
+                  setConfirmClearVisible(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.confirmConfirmText}>{t('Yes') || 'Yes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Mark All Read Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={confirmMarkAllVisible}
+        onRequestClose={() => setConfirmMarkAllVisible(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconContainer}>
+              <Ionicons name="checkmark-done" size={28} color={isDark ? '#10B981' : '#059669'} />
+            </View>
+            <Text style={styles.confirmTitle}>{t('Mark all as read') || 'Mark all as read'}</Text>
+            <Text style={styles.confirmMessage}>
+              {t('Are you sure you want to mark all notifications as read?') || 'Are you sure you want to mark all notifications as read?'}
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                onPress={() => setConfirmMarkAllVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.confirmCancelText}>{t('No') || 'No'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmConfirmBtn}
+                onPress={() => {
+                  markAllRead();
+                  setConfirmMarkAllVisible(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.confirmConfirmText}>{t('Yes') || 'Yes'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -573,33 +652,27 @@ const createStyles = (isDark: boolean) => {
       fontWeight: '700',
     },
     
-    // Clear All Button
-    clearAllContainer: {
-      backgroundColor: colors.cardBackground,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+    // Floating Clear All Button
+    clearFabContainer: {
+      position: 'absolute',
+      bottom: 24,
+      right: 20,
+      alignItems: 'flex-end',
     },
-    clearAllButton: {
-      flexDirection: 'row',
+    clearFab: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#DC2626',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      backgroundColor: isDark ? '#3A3B3C' : '#FEE2E2',
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: isDark ? '#4B5563' : '#FECACA',
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 10,
+      elevation: 6,
     },
-    clearAllText: {
-      fontSize: baseFontSize,
-      fontWeight: '700',
-      color: '#DC2626',
-      letterSpacing: 0.3,
-    },
-    
+
     // Scroll Content
     scrollContent: {
       padding: 12,
@@ -873,6 +946,85 @@ const createStyles = (isDark: boolean) => {
     },
     modalDeleteText: {
       fontSize: baseFontSize + 1,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    
+    // Confirm Clear Modal
+    confirmOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    confirmCard: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: isDark ? '#2a2a2a' : '#FFFFFF',
+      borderRadius: 24,
+      padding: 24,
+      alignItems: 'center',
+      gap: 12,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowOffset: { width: 0, height: 10 },
+      shadowRadius: 20,
+      elevation: 8,
+    },
+    confirmIconContainer: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? 'rgba(220,38,38,0.15)' : '#FEE2E2',
+    },
+    confirmTitle: {
+      fontSize: baseFontSize + 3,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    confirmMessage: {
+      fontSize: baseFontSize,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    confirmActions: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+      marginTop: 8,
+    },
+    confirmCancelBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#3a3a3a' : '#F3F4F6',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    confirmConfirmBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#DC2626',
+      borderWidth: 1,
+      borderColor: '#B91C1C',
+    },
+    confirmCancelText: {
+      fontSize: baseFontSize,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    confirmConfirmText: {
+      fontSize: baseFontSize,
       fontWeight: '700',
       color: '#FFFFFF',
     },

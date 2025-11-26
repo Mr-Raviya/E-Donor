@@ -2,12 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     BackHandler,
     Image,
     Modal,
+    Linking,
     ScrollView,
     StyleSheet,
     Text,
@@ -188,9 +190,11 @@ export default function HomeScreen() {
   const { t, locale } = useLocalization();
   const { themeMode } = useAppearance();
   const { user } = useUser();
+  const userBloodType = (user.bloodType || '').trim();
   const isDark = themeMode === 'dark';
   const donationCount = user.donationCount ?? 0;
   const livesSaved = useMemo(() => Math.max(0, donationCount * 3), [donationCount]);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const [requestCards, setRequestCards] = useState<RequestCard[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
@@ -238,7 +242,13 @@ export default function HomeScreen() {
     setLoadingRequests(true);
     const unsubscribe = listenToDonationRequests(
       (firebaseRequests) => {
-        setRequestCards(firebaseRequests.map(mapDonationRequestToCard));
+        const normalizedUserBlood = userBloodType.toUpperCase();
+        const filtered = firebaseRequests.filter((req) => {
+          const requestBlood = (req.bloodType || '').toUpperCase();
+          if (!normalizedUserBlood) return true;
+          return requestBlood === normalizedUserBlood;
+        });
+        setRequestCards(filtered.map(mapDonationRequestToCard));
         setRequestError(null);
         setLoadingRequests(false);
       },
@@ -250,7 +260,31 @@ export default function HomeScreen() {
     );
 
     return () => unsubscribe();
+  }, [userBloodType]);
+
+  useEffect(() => {
+    const checkTerms = async () => {
+      try {
+        const accepted = await AsyncStorage.getItem('@e_donor_terms_accepted_v1');
+        if (!accepted) {
+          setTermsModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Failed to load terms acceptance state:', error);
+      }
+    };
+    void checkTerms();
   }, []);
+
+  const handleAcceptTerms = async () => {
+    try {
+      await AsyncStorage.setItem('@e_donor_terms_accepted_v1', 'true');
+    } catch (error) {
+      console.error('Failed to persist terms acceptance:', error);
+    } finally {
+      setTermsModalVisible(false);
+    }
+  };
 
   const styles = createStyles(isDark, locale);
 
@@ -402,9 +436,6 @@ export default function HomeScreen() {
               </View>
               <Text style={[styles.statValue, { color: isDark ? levelConfig.textDark : levelConfig.textLight }]}>{levelConfig.label}</Text>
               <Text style={[styles.statLabel, { color: isDark ? '#ccc' : '#374151' }]}>Donor Status</Text>
-              <View style={styles.tapIndicator}>
-                <Ionicons name="chevron-up" size={12} color={isDark ? levelConfig.textDark : levelConfig.textLight} />
-              </View>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -575,6 +606,81 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* First-login Terms Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={termsModalVisible}
+        onRequestClose={handleAcceptTerms}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.termsCard, { backgroundColor: isDark ? '#1F2937' : '#FFFFFF' }]}>
+            <View style={styles.termsHeader}>
+              <Ionicons name="document-text" size={22} color="#DC2626" />
+              <Text style={[styles.termsTitle, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+                Terms & Conditions
+              </Text>
+            </View>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ paddingVertical: 4, gap: 8 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={[styles.termsBody, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                By using E-Donor, you agree to follow these terms. E-Donor connects blood donors,
+                recipients, hospitals, and blood banks. It does not provide medical advice.
+              </Text>
+              <Text style={[styles.termsBody, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                Users must:
+              </Text>
+              <View style={styles.termsList}>
+                {[
+                  'Provide accurate personal and health information',
+                  'Use the app responsibly and legally',
+                  'Avoid fake donation requests or misleading profiles',
+                ].map((item) => (
+                  <View key={item} style={styles.termsListItem}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={[styles.termsListText, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                      {item}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={[styles.termsBody, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                We do not guarantee donor availability, response times, or medical outcomes. Location
+                accuracy and system performance may vary.
+              </Text>
+              <Text style={[styles.termsBody, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                You may not misuse E-Donor for fraud, impersonation, harmful content, or illegal
+                activities. Violation of terms may result in account suspension or deletion.
+              </Text>
+              <Text style={[styles.termsBody, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>
+                All app content, design, and branding belong to the E-Donor development team. Users
+                may not copy or redistribute app materials.
+              </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('mailto:service.edonor@gmail.com')}
+                activeOpacity={0.8}
+                style={styles.termsMailLink}
+              >
+                <Ionicons name="mail" size={14} color="#DC2626" />
+                <Text style={[styles.termsMailText, { color: '#DC2626' }]}>
+                  service.edonor@gmail.com
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.policyActionButton, { alignSelf: 'center', marginTop: 8, marginBottom: 4 }]}
+                onPress={handleAcceptTerms}
+              >
+                <Ionicons name="checkmark-done" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                <Text style={styles.modalPrimaryText}>Agree</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Donor Status Modal */}
       <Modal
@@ -1354,12 +1460,6 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
     borderWidth: 2,
     borderColor: '#BBF7D0',
   },
-  tapIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    opacity: 0.6,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1385,6 +1485,11 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  modalPrimaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
   },
   donorModalIconContainer: {
     width: 88,
@@ -1466,6 +1571,73 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
   donorModalCloseText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  termsCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  termsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  termsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  termsBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'justify',
+  },
+  termsList: {
+    gap: 8,
+    marginBottom: 4,
+  },
+  termsListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  termsListText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsMailLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  termsMailText: {
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  policyActionButton: {
+    backgroundColor: '#DC2626',
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    gap: 8,
   },
 });
 };

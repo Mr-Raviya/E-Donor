@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -55,6 +55,9 @@ export default function SettingsPanel() {
 
   // Privacy
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [showPrivacyAction, setShowPrivacyAction] = useState(false);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
 
   // Change Password Modal
   const [changePasswordModalVisible, setChangePasswordModalVisible] = useState(false);
@@ -270,7 +273,7 @@ export default function SettingsPanel() {
       subtitle: 'Terms of Service',
       icon: 'document-text',
       type: 'action',
-      action: () => openLink('https://example.com/terms'),
+      action: () => setTermsModalVisible(true),
     },
     {
       id: '3',
@@ -278,9 +281,18 @@ export default function SettingsPanel() {
       subtitle: 'Privacy Policy',
       icon: 'shield-checkmark',
       type: 'action',
-      action: () => openLink('https://example.com/privacy'),
+      action: () => {
+        setShowPrivacyAction(false);
+        setPrivacyModalVisible(true);
+      },
     },
   ];
+
+  const handlePrivacyScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 12;
+    setShowPrivacyAction((prev) => (prev === nearBottom ? prev : nearBottom));
+  }, []);
 
   const renderSettingItem = (item: SettingItem) => (
     <TouchableOpacity
@@ -457,6 +469,198 @@ export default function SettingsPanel() {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Privacy Policy Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={privacyModalVisible}
+        onRequestClose={() => {
+          setPrivacyModalVisible(false);
+          setShowPrivacyAction(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <LinearGradient
+            colors={
+              themeMode === 'dark'
+                ? ['#111827', '#1f2937']
+                : ['#fff5f5', '#ffffff']
+            }
+            style={[styles.modalCard, { padding: 0 }]}
+          >
+            <View
+              style={[
+                styles.policyHeader,
+                { backgroundColor: themeMode === 'dark' ? 'rgba(220,38,38,0.12)' : 'rgba(220,38,38,0.08)' },
+              ]}
+            >
+              <View style={styles.policyIcon}>
+                <Ionicons name="shield-checkmark" size={22} color="#DC2626" />
+              </View>
+              <Text style={[styles.modalTitle, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}>
+                Privacy Policy
+              </Text>
+            </View>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ paddingVertical: 4 }}
+              showsVerticalScrollIndicator={false}
+              onScroll={handlePrivacyScroll}
+              scrollEventThrottle={16}
+            >
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                E-Donor collects and uses personal information to provide a safe and effective blood donation platform. This includes your name, contact details, blood type, health eligibility, donation history, and location data for donor–recipient matching. We also collect device information to improve performance and security.
+              </Text>
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                Your data is used to:
+              </Text>
+              <View style={styles.policyList}>
+                {[
+                  'Create and manage your profile',
+                  'Match donors with recipients',
+                  'Send urgent alerts and reminders',
+                  'Support hospitals and blood banks',
+                  'Maintain app security and functionality',
+                ].map((item) => (
+                  <View key={item} style={styles.policyListItem}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={[styles.policyListText, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                      {item}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                We may share your information only with trusted service providers (Firebase, Google Maps), hospitals, and blood banks for request fulfillment. We never sell your data.
+              </Text>
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                All data is stored securely using encryption and strict access control. You may access, update, or delete your data anytime. You can also withdraw consent or disable location access.
+              </Text>
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                E-Donor is not intended for users under 16 without parental consent.
+              </Text>
+              <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                For questions or support:
+              </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('mailto:service.edonor@gmail.com')}
+                activeOpacity={0.8}
+                style={styles.mailLink}
+              >
+                <Ionicons name="mail" size={14} color="#DC2626" />
+                <Text style={[styles.mailLinkText, { color: '#DC2626' }]}>
+                  service.edonor@gmail.com
+                </Text>
+              </TouchableOpacity>
+              {showPrivacyAction ? (
+                <TouchableOpacity
+                  style={[styles.modalPrimaryButton, styles.policyActionButton, { marginTop: 8, marginBottom: 12 }]}
+                  onPress={() => {
+                    setPrivacyModalVisible(false);
+                    setShowPrivacyAction(false);
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                  <Text style={styles.modalPrimaryText}>Got it</Text>
+                </TouchableOpacity>
+              ) : null}
+            </ScrollView>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
+
+      {/* Terms & Conditions Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={termsModalVisible}
+        onRequestClose={() => setTermsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <LinearGradient
+            colors={
+              themeMode === 'dark'
+                ? ['#111827', '#1f2937']
+                : ['#fff5f5', '#ffffff']
+            }
+            style={[styles.modalCard, { padding: 0 }]}
+          >
+            <View
+              style={[
+                styles.policyHeader,
+                { backgroundColor: themeMode === 'dark' ? 'rgba(220,38,38,0.12)' : 'rgba(220,38,38,0.08)' },
+              ]}
+            >
+              <View style={styles.policyIcon}>
+                <Ionicons name="document-text" size={22} color="#DC2626" />
+              </View>
+              <Text style={[styles.modalTitle, { color: themeMode === 'dark' ? '#fff' : '#111827' }]}>
+                Terms & Conditions
+              </Text>
+            </View>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+              <ScrollView
+                style={{ maxHeight: 420 }}
+                contentContainerStyle={{ paddingVertical: 4, gap: 8 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                  By using E-Donor, you agree to follow these terms. E-Donor connects blood donors, recipients, hospitals, and blood banks. It does not provide medical advice.
+                </Text>
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937', textAlign: 'justify' }]}>
+                  Users must:
+                </Text>
+                <View style={styles.policyList}>
+                  {[
+                    'Provide accurate personal and health information',
+                    'Use the app responsibly and legally',
+                    'Avoid fake donation requests or misleading profiles',
+                  ].map((item) => (
+                    <View key={item} style={styles.policyListItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                      <Text style={[styles.policyListText, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                        {item}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                  We do not guarantee donor availability, response times, or medical outcomes. Location accuracy and system performance may vary.
+                </Text>
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                  You may not misuse E-Donor for fraud, impersonation, harmful content, or illegal activities. Violation of terms may result in account suspension or deletion.
+                </Text>
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                  All app content, design, and branding belong to the E-Donor development team. Users may not copy or redistribute app materials.
+                </Text>
+                <Text style={[styles.policyBody, { color: themeMode === 'dark' ? '#E5E7EB' : '#1F2937' }]}>
+                  For assistance or questions:
+                </Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL('mailto:service.edonor@gmail.com')}
+                  activeOpacity={0.8}
+                  style={[styles.mailLink, { marginTop: -18, marginBottom: 10 }]}
+                >
+                  <Ionicons name="mail" size={14} color="#DC2626" />
+                  <Text style={[styles.mailLinkText, { color: '#DC2626' }]}>
+                    service.edonor@gmail.com
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalPrimaryButton, styles.policyActionButton, { marginTop: 8, marginBottom: 12 }]}
+                  onPress={() => setTermsModalVisible(false)}
+                >
+                  <Ionicons name="checkmark-done" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                  <Text style={styles.modalPrimaryText}>Agree</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </LinearGradient>
         </View>
       </Modal>
 
@@ -796,6 +1000,71 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: 'white',
+  },
+  policyBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    textAlign: 'justify',
+  },
+  policyList: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  policyListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  policyListText: {
+    fontSize: 14,
+    lineHeight: 20,
+    flex: 1,
+  },
+  policyHeader: {
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  policyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  mailLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -10,
+    marginBottom: 12,
+  },
+  mailLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  policyActionButton: {
+    backgroundColor: '#DC2626',
+    shadowColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 8,
   },
   passwordModalCard: {
     maxWidth: 400,

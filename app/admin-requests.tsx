@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     Modal,
@@ -13,86 +14,65 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface BloodRequest {
-  id: string;
-  patientName: string;
-  bloodType: string;
-  unitsNeeded: number;
-  urgency: 'critical' | 'urgent' | 'normal';
-  hospital: string;
-  requestDate: string;
-  status: 'pending' | 'approved' | 'fulfilled' | 'rejected';
-  contactPerson: string;
-  contactNumber: string;
-  notes: string;
-}
-
-const initialRequests: BloodRequest[] = [
-  {
-    id: '1',
-    patientName: 'Dilshan Amarasinghe',
-    bloodType: 'O+',
-    unitsNeeded: 3,
-    urgency: 'critical',
-    hospital: 'National Hospital of Sri Lanka',
-    requestDate: '2025-11-16',
-    status: 'pending',
-    contactPerson: 'Dr. Priyantha Rathnayake',
-    contactNumber: '+94 11 269 1111',
-    notes: 'Emergency surgery required',
-  },
-  {
-    id: '2',
-    patientName: 'Tharaka Wijesekara',
-    bloodType: 'A+',
-    unitsNeeded: 2,
-    urgency: 'urgent',
-    hospital: 'Lanka Hospitals',
-    requestDate: '2025-11-16',
-    status: 'approved',
-    contactPerson: 'Dr. Samanthi Jayawardena',
-    contactNumber: '+94 11 543 4000',
-    notes: 'Scheduled for tomorrow morning',
-  },
-  {
-    id: '3',
-    patientName: 'Nadeeka Bandara',
-    bloodType: 'B+',
-    unitsNeeded: 1,
-    urgency: 'normal',
-    hospital: 'Asiri Central Hospital',
-    requestDate: '2025-11-15',
-    status: 'fulfilled',
-    contactPerson: 'Nurse Kumari',
-    contactNumber: '+94 11 466 5500',
-    notes: 'Routine transfusion',
-  },
-];
+import {
+  deleteDonationRequest,
+  DonationRequest,
+  listenToDonationRequests,
+  updateDonationRequestStatus
+} from './services/donationRequestService';
 
 export default function AdminRequests() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [requests, setRequests] = useState<BloodRequest[]>(initialRequests);
-  const [filterStatus, setFilterStatus] = useState<'all' | BloodRequest['status']>('all');
-  const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null);
+  const [requests, setRequests] = useState<DonationRequest[]>([]);
+  const [filterStatus, setFilterStatus] = useState<'all' | NonNullable<DonationRequest['status']>>('all');
+  const [selectedRequest, setSelectedRequest] = useState<DonationRequest | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<DonationRequest | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  React.useEffect(() => {
+    setLoading(true);
+    const unsubscribe = listenToDonationRequests(
+      (liveRequests) => {
+        setRequests(liveRequests);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Failed to load requests', err);
+        setError('Unable to load blood requests right now.');
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   const filteredRequests = requests.filter((request) =>
     filterStatus === 'all' || request.status === filterStatus
   );
 
-  const handleUpdateStatus = (requestId: string, newStatus: BloodRequest['status']) => {
-    setRequests(
-      requests.map((request) =>
-        request.id === requestId ? { ...request, status: newStatus } : request
-      )
-    );
-    setShowDetailModal(false);
-    Alert.alert('Success', `Request ${newStatus} successfully`);
+  const handleUpdateStatus = async (
+    requestId: string,
+    newStatus: NonNullable<DonationRequest['status']>
+  ) => {
+    setUpdatingStatus(true);
+    try {
+      await updateDonationRequestStatus(requestId, newStatus);
+      setShowDetailModal(false);
+      Alert.alert('Success', `Request ${newStatus} successfully`);
+    } catch (err) {
+      console.error('Failed to update status', err);
+      Alert.alert('Error', 'Could not update request status. Please try again.');
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
-  const getUrgencyColor = (urgency: BloodRequest['urgency']) => {
+  const getUrgencyColor = (urgency: DonationRequest['urgency']) => {
     switch (urgency) {
       case 'critical':
         return { bg: '#FEE2E2', text: '#DC2626' };
@@ -103,7 +83,7 @@ export default function AdminRequests() {
     }
   };
 
-  const getStatusColor = (status: BloodRequest['status']) => {
+  const getStatusColor = (status: NonNullable<DonationRequest['status']>) => {
     switch (status) {
       case 'pending':
         return { bg: '#FEF3C7', text: '#CA8A04' };
@@ -113,12 +93,27 @@ export default function AdminRequests() {
         return { bg: '#D1FAE5', text: '#059669' };
       case 'rejected':
         return { bg: '#FEE2E2', text: '#DC2626' };
+      default:
+        return { bg: '#FEF3C7', text: '#CA8A04' };
     }
   };
 
-  const renderRequest = ({ item }: { item: BloodRequest }) => {
+  const formatRequestDate = (request: DonationRequest) => {
+    if (request.date) return request.date;
+    if (request.createdAt instanceof Date) return request.createdAt.toLocaleDateString();
+    return 'N/A';
+  };
+
+  const getUnitsNeeded = (request: DonationRequest) => {
+    // Keep compatibility with any legacy field naming
+    return request.units ?? (request as any).unitsNeeded ?? 0;
+  };
+
+  const renderRequest = ({ item }: { item: DonationRequest }) => {
     const urgencyColors = getUrgencyColor(item.urgency);
     const statusColors = getStatusColor(item.status);
+    const unitsNeeded = getUnitsNeeded(item);
+    const requestDate = formatRequestDate(item);
 
     return (
       <TouchableOpacity
@@ -148,11 +143,11 @@ export default function AdminRequests() {
         <View style={styles.requestInfo}>
           <View style={styles.infoItem}>
             <Ionicons name="fitness" size={16} color="#666" />
-            <Text style={styles.infoText}>{item.unitsNeeded} units needed</Text>
+            <Text style={styles.infoText}>{unitsNeeded} units needed</Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="calendar" size={16} color="#666" />
-            <Text style={styles.infoText}>{item.requestDate}</Text>
+            <Text style={styles.infoText}>{requestDate}</Text>
           </View>
         </View>
 
@@ -208,16 +203,33 @@ export default function AdminRequests() {
             ))}
           </View>
         </ScrollView>
+        {error && (
+          <Text style={styles.errorText}>{error}</Text>
+        )}
       </View>
 
       {/* Requests List */}
-      <FlatList
-        data={filteredRequests}
-        renderItem={renderRequest}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC143C" />
+          <Text style={styles.loadingText}>Loading requests...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredRequests}
+          renderItem={renderRequest}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="water-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No blood requests</Text>
+              <Text style={styles.emptySubtext}>Requests will appear here when hospitals add them.</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Detail Modal */}
       <Modal visible={showDetailModal} animationType="slide" transparent>
@@ -254,7 +266,7 @@ export default function AdminRequests() {
 
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Units Needed</Text>
-                      <Text style={styles.detailValue}>{selectedRequest.unitsNeeded} units</Text>
+                      <Text style={styles.detailValue}>{getUnitsNeeded(selectedRequest)} units</Text>
                     </View>
 
                     <View style={styles.detailRow}>
@@ -269,7 +281,7 @@ export default function AdminRequests() {
 
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Request Date</Text>
-                      <Text style={styles.detailValue}>{selectedRequest.requestDate}</Text>
+                      <Text style={styles.detailValue}>{formatRequestDate(selectedRequest)}</Text>
                     </View>
 
                     <View style={styles.detailRow}>
@@ -312,7 +324,7 @@ export default function AdminRequests() {
 
                     <View style={styles.notesSection}>
                       <Text style={styles.detailLabel}>Notes</Text>
-                      <Text style={styles.notesText}>{selectedRequest.notes}</Text>
+                      <Text style={styles.notesText}>{selectedRequest.notes || 'No notes provided.'}</Text>
                     </View>
                   </View>
 
@@ -321,6 +333,7 @@ export default function AdminRequests() {
                       <TouchableOpacity
                         style={styles.approveButton}
                         onPress={() => handleUpdateStatus(selectedRequest.id, 'approved')}
+                        disabled={updatingStatus}
                       >
                         <LinearGradient
                           colors={['#059669', '#047857']}
@@ -333,6 +346,7 @@ export default function AdminRequests() {
                       <TouchableOpacity
                         style={styles.rejectButton}
                         onPress={() => handleUpdateStatus(selectedRequest.id, 'rejected')}
+                        disabled={updatingStatus}
                       >
                         <LinearGradient
                           colors={['#DC2626', '#991B1B']}
@@ -349,6 +363,7 @@ export default function AdminRequests() {
                     <TouchableOpacity
                       style={styles.fulfillButton}
                       onPress={() => handleUpdateStatus(selectedRequest.id, 'fulfilled')}
+                      disabled={updatingStatus}
                     >
                       <LinearGradient
                         colors={['#2563EB', '#1D4ED8']}
@@ -359,9 +374,70 @@ export default function AdminRequests() {
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => setDeleteCandidate(selectedRequest)}
+                    disabled={deleting}
+                  >
+                    <LinearGradient colors={['#DC2626', '#991B1B']} style={styles.actionButtonGradient}>
+                      <Ionicons name="trash-outline" size={22} color="#fff" />
+                      <Text style={styles.actionButtonText}>Delete Request</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </ScrollView>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete confirmation */}
+      <Modal visible={!!deleteCandidate} animationType="fade" transparent>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIcon}>
+              <Ionicons name="trash-outline" size={26} color="#DC2626" />
+            </View>
+            <Text style={styles.confirmTitle}>Delete this blood request?</Text>
+            <Text style={styles.confirmMessage}>
+              This will remove the request from the app for all users. This action cannot be undone.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancel}
+                onPress={() => setDeleteCandidate(null)}
+                disabled={deleting}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmDelete, deleting && styles.confirmDeleteDisabled]}
+                onPress={async () => {
+                  if (!deleteCandidate) return;
+                  setDeleting(true);
+                  try {
+                    await deleteDonationRequest(deleteCandidate.id);
+                    setDeleteCandidate(null);
+                    setShowDetailModal(false);
+                  } catch (err) {
+                    console.error('Failed to delete request', err);
+                    Alert.alert('Error', 'Could not delete request. Please try again.');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={18} color="#fff" />
+                    <Text style={styles.confirmDeleteText}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -419,6 +495,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  errorText: {
+    color: '#DC2626',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    fontSize: 13,
+    fontWeight: '600',
   },
   filterButtons: {
     flexDirection: 'row',
@@ -616,6 +699,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  deleteButton: {
+    marginTop: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   actionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -627,5 +715,105 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#666',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#666',
+  },
+  emptySubtext: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  confirmIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    marginTop: 8,
+  },
+  confirmCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  confirmDelete: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#DC2626',
+  },
+  confirmDeleteDisabled: {
+    opacity: 0.7,
+  },
+  confirmCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  confirmDeleteText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

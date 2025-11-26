@@ -16,7 +16,11 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
-import { listenToAdminNotifications, sendNotification } from './services/notificationService';
+import {
+  deleteAdminNotification,
+  listenToAdminNotifications,
+  sendNotification
+} from './services/notificationService';
 
 interface Notification {
   id: string;
@@ -90,6 +94,8 @@ export default function AdminNotifications() {
   const [selectedTemplate, setSelectedTemplate] = useState<typeof notificationTemplates[0] | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<Notification | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [newNotification, setNewNotification] = useState({
     title: '',
@@ -156,6 +162,22 @@ export default function AdminNotifications() {
     }
   };
 
+  const handleDeleteNotification = async () => {
+    if (!deleteCandidate) return;
+
+    setDeleting(true);
+    try {
+      await deleteAdminNotification(deleteCandidate.id);
+      setNotifications((prev) => prev.filter((item) => item.id !== deleteCandidate.id));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      Alert.alert('Error', 'Failed to delete notification. Please try again.');
+    } finally {
+      setDeleting(false);
+      setDeleteCandidate(null);
+    }
+  };
+
   const getTypeColor = (type: Notification['type']) => {
     switch (type) {
       case 'urgent':
@@ -182,7 +204,16 @@ export default function AdminNotifications() {
               {item.type.toUpperCase()}
             </Text>
           </View>
-          <Text style={styles.sentDate}>{item.sentDate}</Text>
+          <View style={styles.headerActions}>
+            <Text style={styles.sentDate}>{item.sentDate}</Text>
+            <TouchableOpacity
+              onPress={() => setDeleteCandidate(item)}
+              style={styles.deleteButton}
+              accessibilityLabel="Delete notification"
+            >
+              <Ionicons name="trash-outline" size={18} color="#DC2626" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.notificationTitle}>{item.title}</Text>
@@ -414,6 +445,44 @@ export default function AdminNotifications() {
           </View>
         </View>
       </Modal>
+
+      {/* Delete confirmation */}
+      <Modal visible={!!deleteCandidate} animationType="fade" transparent>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIcon}>
+              <Ionicons name="trash-outline" size={26} color="#DC2626" />
+            </View>
+            <Text style={styles.confirmTitle}>Delete this notification?</Text>
+            <Text style={styles.confirmMessage}>
+              This removes the notification from the admin feed and hides it for all users.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancel}
+                onPress={() => setDeleteCandidate(null)}
+                disabled={deleting}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmDelete, deleting && styles.confirmDeleteDisabled]}
+                onPress={handleDeleteNotification}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={18} color="#fff" />
+                    <Text style={styles.confirmDeleteText}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -491,6 +560,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFE4E6',
   },
   typeBadge: {
     flexDirection: 'row',
@@ -726,5 +805,78 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: '#999',
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  confirmIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    marginTop: 8,
+  },
+  confirmCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  confirmDelete: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#DC2626',
+  },
+  confirmDeleteDisabled: {
+    opacity: 0.7,
+  },
+  confirmCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  confirmDeleteText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

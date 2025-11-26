@@ -83,13 +83,17 @@ export const upsertUserProfile = async (
   
   // Also create/update in users collection for notifications
   try {
+    // Mirror key fields into users collection for downstream features (notifications, targeting, etc.)
     const userData = {
       email: profile.email || '',
       name: profile.name || '',
       role: 'donor', // Default role for new users
       bloodType: profile.bloodType || 'O+',
+      // Store contact/location under multiple keys for compatibility with existing queries
       location: profile.location || '',
+      city: profile.location || '',
       phone: profile.phone || '',
+      mobileNumber: profile.phone || '',
       isActive: true,
       createdAt: new Date(),
     };
