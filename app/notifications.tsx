@@ -1,20 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import {
+    clearAllUserNotifications,
+    deleteUserNotification,
     listenToUserNotifications,
     markAllNotificationsAsRead,
     markNotificationAsRead,
@@ -40,6 +44,8 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(true);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const styles = createStyles(isDark);
 
@@ -125,12 +131,29 @@ export default function NotificationsScreen() {
     }
   }
 
-  function clearAll() {
-    setNotifications([]);
+  async function clearAll() {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await clearAllUserNotifications(currentUser.uid);
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
   }
 
-  function deleteNotification(id: string) {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  async function deleteNotification(id: string) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      await deleteUserNotification(id, currentUser.uid);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
   }
 
   async function toggleRead(id: string) {
@@ -149,6 +172,25 @@ export default function NotificationsScreen() {
       console.error('Error marking notification as read:', error);
     }
   }
+
+  // Open notification detail modal
+  const openNotificationDetail = async (notification: NotificationItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedNotification(notification);
+    setModalVisible(true);
+    
+    // Mark as read when opened
+    if (!notification.read) {
+      await toggleRead(notification.id);
+    }
+  };
+
+  // Close notification detail modal
+  const closeNotificationDetail = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setModalVisible(false);
+    setSelectedNotification(null);
+  };
 
   const displayedNotifications = notifications.filter((n) => 
     activeTab === 'unread' ? !n.read : true
@@ -260,7 +302,7 @@ export default function NotificationsScreen() {
               <TouchableOpacity
                 key={notification.id}
                 style={styles.notificationCard}
-                onPress={() => toggleRead(notification.id)}
+                onPress={() => openNotificationDetail(notification)}
                 activeOpacity={0.8}
               >
                 <View style={styles.cardContent}>
@@ -305,6 +347,71 @@ export default function NotificationsScreen() {
           })
         )}
       </ScrollView>
+
+      {/* Notification Detail Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={modalVisible}
+        onRequestClose={closeNotificationDetail}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {selectedNotification && (
+              <>
+                {/* Notification Icon */}
+                <View style={[
+                  styles.modalIconContainer, 
+                  { backgroundColor: getNotificationConfig(selectedNotification.type).gradient[0] }
+                ]}>
+                  <Ionicons 
+                    name={getNotificationConfig(selectedNotification.type).icon as any} 
+                    size={40} 
+                    color="#FFFFFF" 
+                  />
+                </View>
+
+                {/* Notification Title */}
+                <Text style={styles.modalTitle}>{selectedNotification.title}</Text>
+
+                {/* Notification Time */}
+                <View style={styles.modalTimeContainer}>
+                  <Ionicons name="time-outline" size={16} color={isDark ? '#999' : '#6B7280'} />
+                  <Text style={styles.modalTime}>{selectedNotification.time}</Text>
+                </View>
+
+                {/* Full Message */}
+                <ScrollView style={styles.modalMessageScroll} showsVerticalScrollIndicator={false}>
+                  <Text style={styles.modalMessage}>{selectedNotification.body}</Text>
+                </ScrollView>
+
+                {/* Action Buttons */}
+                <View style={styles.modalButtonRow}>
+                  <TouchableOpacity
+                    style={styles.modalDismissButton}
+                    onPress={closeNotificationDetail}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalDismissText}>{t('close') || 'Close'}</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.modalDeleteButton}
+                    onPress={() => {
+                      deleteNotification(selectedNotification.id);
+                      closeNotificationDetail();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.modalDeleteText}>{t('delete') || 'Delete'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -667,6 +774,105 @@ const createStyles = (isDark: boolean) => {
       marginTop: 16,
       fontSize: baseFontSize,
       color: colors.textSecondary,
+    },
+
+    // Notification Detail Modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 360,
+      maxHeight: '70%',
+      backgroundColor: isDark ? '#2a2a2a' : '#FFFFFF',
+      borderRadius: 28,
+      padding: 24,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.25,
+      shadowOffset: { width: 0, height: 10 },
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    modalIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowOffset: { width: 0, height: 4 },
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    modalTitle: {
+      fontSize: baseFontSize + 6,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 8,
+      letterSpacing: 0.3,
+    },
+    modalTimeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 16,
+    },
+    modalTime: {
+      fontSize: baseFontSize - 1,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    modalMessageScroll: {
+      maxHeight: 150,
+      width: '100%',
+      marginBottom: 24,
+    },
+    modalMessage: {
+      fontSize: baseFontSize + 1,
+      lineHeight: 24,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    modalButtonRow: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    modalDismissButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#3a3a3a' : '#F3F4F6',
+    },
+    modalDismissText: {
+      fontSize: baseFontSize + 1,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    modalDeleteButton: {
+      flex: 1,
+      flexDirection: 'row',
+      paddingVertical: 14,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#DC2626',
+      gap: 8,
+    },
+    modalDeleteText: {
+      fontSize: baseFontSize + 1,
+      fontWeight: '700',
+      color: '#FFFFFF',
     },
   });
 };

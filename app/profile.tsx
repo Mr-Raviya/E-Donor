@@ -25,11 +25,73 @@ const getBasicInfo = (t: (key: string) => string, user: any, memberSince: string
   { icon: 'calendar-outline' as const, label: t('memberSince'), value: memberSince },
 ];
 
+type DonorLevel = 'Bronze' | 'Silver' | 'Gold';
+
+const DONOR_LEVEL_COLORS: Record<DonorLevel, { bg: string; bgDark: string; text: string; textDark: string }> = {
+  Bronze: { bg: '#FED7AA', bgDark: '#7C2D12', text: '#C2410C', textDark: '#FDBA74' },
+  Silver: { bg: '#E5E7EB', bgDark: '#374151', text: '#374151', textDark: '#D1D5DB' },
+  Gold: { bg: '#FEF3C7', bgDark: '#78350F', text: '#B45309', textDark: '#FDE68A' },
+};
+
+const getDonorLevel = (level: string | undefined): DonorLevel => {
+  if (level === 'Gold' || level === 'Silver' || level === 'Bronze') {
+    return level;
+  }
+  return 'Bronze';
+};
+
+const getDonorLevelLabel = (level: string | undefined): string => {
+  switch (level) {
+    case 'Gold':
+      return 'Gold Donor';
+    case 'Silver':
+      return 'Silver Donor';
+    case 'Bronze':
+      return 'Bronze Donor';
+    default:
+      return 'Bronze Donor';
+  }
+};
+
+const formatLastDonationDate = (dateString: string | undefined): string => {
+  if (!dateString) return 'No donations yet';
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return dateString;
+  }
+};
+
+const calculateNextEligible = (lastDonation: string | undefined): string => {
+  if (!lastDonation) return 'Eligible now';
+  try {
+    const lastDate = new Date(lastDonation);
+    // 56 days (8 weeks) minimum between donations
+    const nextDate = new Date(lastDate.getTime() + 56 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    
+    if (nextDate <= now) return 'Eligible now';
+    
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(nextDate);
+  } catch {
+    return 'Eligible now';
+  }
+};
+
 const getAdditionalDetails = (t: (key: string) => string, user: any) => [
-  { label: t('totalDonations'), value: '12' },
-  { label: t('lastDonation'), value: 'July 15, 2025' },
-  { label: t('donorStatus'), value: t('goldDonor') },
-  { label: t('nextEligible'), value: 'October 20, 2025' },
+  { label: t('totalDonations'), value: String(user.donationCount ?? 0) },
+  { label: t('lastDonation'), value: formatLastDonationDate(user.lastDonationDate) },
+  { label: t('donorStatus'), value: getDonorLevelLabel(user.donorLevel) },
+  { label: t('nextEligible'), value: calculateNextEligible(user.lastDonationDate) },
 ];
 
 export default function ProfileScreen() {
@@ -39,6 +101,7 @@ export default function ProfileScreen() {
   const { user, session } = useUser();
   const isDark = themeMode === 'dark';
   const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
+  const [donorStatusModalVisible, setDonorStatusModalVisible] = React.useState(false);
 
   const memberSince = React.useMemo(() => {
     const creation = session?.metadata?.creationTime;
@@ -55,6 +118,30 @@ export default function ProfileScreen() {
   
   const basicInfo = getBasicInfo(t, user, memberSince);
   const additionalDetails = getAdditionalDetails(t, user);
+  
+  // Get donor level colors
+  const donorLevel = getDonorLevel(user.donorLevel);
+  const levelColors = DONOR_LEVEL_COLORS[donorLevel];
+  
+  // Calculate donor progress
+  const donationCount = user.donationCount ?? 0;
+  const getDonorProgress = () => {
+    // Bronze: 0-4 donations (0-33% bar), Silver: 5-14 donations (33-66% bar), Gold: 15+ donations (66-100% bar)
+    if (donorLevel === 'Gold') {
+      // Gold: 100% filled
+      return { progress: 100, barWidth: 100, nextLevel: null, donationsToNext: 0, currentMin: 15, nextMin: 15 };
+    } else if (donorLevel === 'Silver') {
+      // Silver: bar fills from 33% to 66% (progress within silver tier)
+      const silverProgress = ((donationCount - 5) / 10) * 33; // 0-33% of silver segment
+      const barWidth = 33 + silverProgress; // 33% (bronze complete) + silver progress
+      return { progress: silverProgress, barWidth, nextLevel: 'Gold', donationsToNext: 15 - donationCount, currentMin: 5, nextMin: 15 };
+    } else {
+      // Bronze: bar fills from 0% to 33%
+      const bronzeProgress = (donationCount / 5) * 33; // 0-33% of bronze segment
+      return { progress: bronzeProgress, barWidth: bronzeProgress, nextLevel: 'Silver', donationsToNext: 5 - donationCount, currentMin: 0, nextMin: 5 };
+    }
+  };
+  const donorProgress = getDonorProgress();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}>
@@ -144,7 +231,26 @@ export default function ProfileScreen() {
                 }]}
               >
                 <Text style={[styles.detailLabel, { color: isDark ? '#999' : '#666' }]}>{detail.label}</Text>
-                <Text style={[styles.detailValue, { color: isDark ? '#fff' : '#1a1a1a' }]}>{detail.value}</Text>
+                {detail.label === t('donorStatus') ? (
+                  <TouchableOpacity 
+                    style={[styles.donorLevelBadge, { 
+                      backgroundColor: isDark ? levelColors.bgDark : levelColors.bg 
+                    }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setDonorStatusModalVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="medal-outline" size={14} color={isDark ? levelColors.textDark : levelColors.text} />
+                    <Text style={[styles.donorLevelText, { color: isDark ? levelColors.textDark : levelColors.text }]}>
+                      {getDonorLevelLabel(donorLevel)}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={isDark ? levelColors.textDark : levelColors.text} />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[styles.detailValue, { color: isDark ? '#fff' : '#1a1a1a' }]}>{detail.value}</Text>
+                )}
               </View>
             ))}
           </View>
@@ -191,6 +297,97 @@ export default function ProfileScreen() {
           <Text style={[styles.footerText, { color: isDark ? '#999' : '#666' }]}>{t('edonorProfile')}</Text>
         </View>
       </ScrollView>
+
+      {/* Donor Status Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={donorStatusModalVisible}
+        onRequestClose={() => setDonorStatusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: isDark ? '#2a2a2a' : '#fff' }]}>
+            {/* Medal Icon with Glow */}
+            <View style={[styles.donorModalIconContainer, { backgroundColor: isDark ? levelColors.bgDark : levelColors.bg }]}>
+              <Ionicons name="medal" size={48} color={isDark ? levelColors.textDark : levelColors.text} />
+            </View>
+            
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#111827' }]}>
+              {getDonorLevelLabel(donorLevel)}
+            </Text>
+            <Text style={[styles.donorModalSubtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              {donationCount} {donationCount === 1 ? 'donation' : 'donations'} completed
+            </Text>
+            
+            {/* Progress Section */}
+            <View style={styles.donorProgressSection}>
+              {/* Level Indicators */}
+              <View style={styles.levelIndicators}>
+                <View style={styles.levelIndicator}>
+                  <View style={[styles.levelDot, { backgroundColor: DONOR_LEVEL_COLORS.Bronze.text }]} />
+                  <Text style={[styles.levelLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Bronze</Text>
+                  <Text style={[styles.levelCount, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>0+</Text>
+                </View>
+                <View style={styles.levelIndicator}>
+                  <View style={[styles.levelDot, { backgroundColor: DONOR_LEVEL_COLORS.Silver.text }]} />
+                  <Text style={[styles.levelLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Silver</Text>
+                  <Text style={[styles.levelCount, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>5+</Text>
+                </View>
+                <View style={styles.levelIndicator}>
+                  <View style={[styles.levelDot, { backgroundColor: DONOR_LEVEL_COLORS.Gold.text }]} />
+                  <Text style={[styles.levelLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>Gold</Text>
+                  <Text style={[styles.levelCount, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>15+</Text>
+                </View>
+              </View>
+              
+              {/* Progress Bar */}
+              <View style={[styles.donorProgressBarContainer, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}>
+                <LinearGradient
+                  colors={donorLevel === 'Gold' ? ['#F59E0B', '#D97706'] : donorLevel === 'Silver' ? ['#9CA3AF', '#6B7280'] : ['#F97316', '#EA580C']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.donorProgressBar, { width: `${Math.max(5, donorProgress.barWidth)}%` }]}
+                />
+                {/* Level Markers */}
+                <View style={[styles.levelMarker, { left: '0%' }]} />
+                <View style={[styles.levelMarker, { left: '33.3%' }]} />
+                <View style={[styles.levelMarker, { left: '66.6%' }]} />
+                <View style={[styles.levelMarker, { left: '100%' }]} />
+              </View>
+              
+              {/* Next Level Info */}
+              {donorProgress.nextLevel ? (
+                <View style={[styles.nextLevelInfo, { backgroundColor: isDark ? '#374151' : '#F3F4F6' }]}>
+                  <Ionicons name="arrow-up-circle" size={20} color="#10B981" />
+                  <Text style={[styles.nextLevelText, { color: isDark ? '#D1D5DB' : '#374151' }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>{donorProgress.donationsToNext} more</Text>
+                    {' '}donation{donorProgress.donationsToNext !== 1 ? 's' : ''} to reach{' '}
+                    <Text style={{ fontWeight: '700', color: DONOR_LEVEL_COLORS[donorProgress.nextLevel as DonorLevel].text }}>
+                      {donorProgress.nextLevel}
+                    </Text>
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.nextLevelInfo, { backgroundColor: isDark ? '#374151' : '#F3F4F6' }]}>
+                  <Ionicons name="trophy" size={20} color="#F59E0B" />
+                  <Text style={[styles.nextLevelText, { color: isDark ? '#D1D5DB' : '#374151' }]}>
+                    🎉 You've reached the highest level!
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Close Button */}
+            <TouchableOpacity
+              style={[styles.donorModalCloseButton, { backgroundColor: isDark ? levelColors.bgDark : levelColors.bg }]}
+              onPress={() => setDonorStatusModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.donorModalCloseText, { color: isDark ? levelColors.textDark : levelColors.text }]}>Got it!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Logout Confirmation Modal */}
       <Modal
@@ -472,5 +669,98 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: 'white',
+  },
+  donorLevelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  donorLevelText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  donorModalIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  donorModalSubtitle: {
+    fontSize: 15,
+    marginBottom: 24,
+  },
+  donorProgressSection: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  levelIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  levelIndicator: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  levelDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  levelLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  levelCount: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  donorProgressBarContainer: {
+    height: 12,
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 16,
+  },
+  donorProgressBar: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  levelMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    transform: [{ translateX: -1 }],
+  },
+  nextLevelInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  nextLevelText: {
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  donorModalCloseButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donorModalCloseText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

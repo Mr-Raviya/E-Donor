@@ -214,7 +214,7 @@ export default function AdminSettings() {
             </View>
             <View style={[styles.infoItem, { borderBottomColor: themeMode === 'dark' ? '#3a3a3a' : '#f0f0f0' }]}>
               <Text style={[styles.infoLabel, { color: themeMode === 'dark' ? '#999' : '#666' }]}>Build</Text>
-              <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>2025.11.06</Text>
+              <Text style={[styles.infoValue, { color: themeMode === 'dark' ? '#fff' : '#1a1a1a' }]}>2025.11.25</Text>
             </View>
           </View>
         </View>

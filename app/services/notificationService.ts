@@ -11,7 +11,7 @@ import {
     serverTimestamp,
     Timestamp,
     updateDoc,
-    where,
+    where
 } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 
@@ -203,6 +203,7 @@ const getTargetUserIds = async (targetAudience: TargetAudience): Promise<string[
 /**
  * Real-time listener for user notifications
  * This function sets up a live listener that receives notifications instantly
+ * Filters out notifications that have been deleted by the user
  */
 export const listenToUserNotifications = (
   userId: string,
@@ -221,22 +222,28 @@ export const listenToUserNotifications = (
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const notifications: UserNotification[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            notificationId: data.notificationId,
-            title: data.title,
-            message: data.message,
-            type: data.type as NotificationType,
-            targetAudience: 'all', // This is at user level now
-            sentBy: data.sentBy,
-            sentDate: data.receivedAt,
-            read: data.read || false,
-            receivedAt: data.receivedAt,
-            metadata: data.metadata || {},
-          } as UserNotification;
-        });
+        const notifications: UserNotification[] = snapshot.docs
+          .filter((doc) => {
+            const data = doc.data();
+            // Filter out deleted notifications
+            return data.deleted !== true;
+          })
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              notificationId: data.notificationId,
+              title: data.title,
+              message: data.message,
+              type: data.type as NotificationType,
+              targetAudience: 'all', // This is at user level now
+              sentBy: data.sentBy,
+              sentDate: data.receivedAt,
+              read: data.read || false,
+              receivedAt: data.receivedAt,
+              metadata: data.metadata || {},
+            } as UserNotification;
+          });
 
         onNotificationsUpdate(notifications);
       },
@@ -304,6 +311,62 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<void> 
     console.log(`Marked ${batch.length} notifications as read`);
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a single notification for a user (marks as deleted, only affects this user)
+ */
+export const deleteUserNotification = async (
+  notificationId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const notificationRef = doc(db, USER_NOTIFICATIONS_COLLECTION, notificationId);
+    await updateDoc(notificationRef, {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+    });
+
+    console.log('Notification deleted for user:', notificationId);
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clear all notifications for a user (marks all as deleted, only affects this user)
+ */
+export const clearAllUserNotifications = async (userId: string): Promise<void> => {
+  try {
+    // Simple query with single where clause to avoid index requirement
+    const q = query(
+      collection(db, USER_NOTIFICATIONS_COLLECTION),
+      where('userId', '==', userId)
+    );
+
+    const snapshot = await getDocs(q);
+    const batch: Promise<any>[] = [];
+
+    // Filter out already deleted notifications in code
+    snapshot.docs.forEach((document) => {
+      const data = document.data();
+      if (data.deleted !== true) {
+        batch.push(
+          updateDoc(doc(db, USER_NOTIFICATIONS_COLLECTION, document.id), {
+            deleted: true,
+            deletedAt: serverTimestamp(),
+          })
+        );
+      }
+    });
+
+    await Promise.all(batch);
+    console.log(`Cleared ${batch.length} notifications for user`);
+  } catch (error) {
+    console.error('Error clearing all notifications:', error);
     throw error;
   }
 };

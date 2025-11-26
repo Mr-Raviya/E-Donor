@@ -35,6 +35,14 @@ import { UserProfile } from './types/user';
 const emailPattern = /^[^\s@]+@[A-Za-z0-9][^\s@]*\.[A-Za-z]{2,}$/;
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,12}$/;
 
+type DonorLevel = 'Bronze' | 'Silver' | 'Gold';
+
+const DONOR_LEVEL_COLORS: Record<DonorLevel, { bg: string; text: string; gradient: string[] }> = {
+  Bronze: { bg: '#FED7AA', text: '#C2410C', gradient: ['#FB923C', '#EA580C'] },
+  Silver: { bg: '#E5E7EB', text: '#374151', gradient: ['#9CA3AF', '#6B7280'] },
+  Gold: { bg: '#FEF3C7', text: '#B45309', gradient: ['#FBBF24', '#D97706'] },
+};
+
 interface User {
   id: string;
   name: string;
@@ -44,6 +52,7 @@ interface User {
   status: 'active' | 'inactive';
   joinedDate: string;
   donationCount: number;
+  donorLevel: DonorLevel;
 }
 
 const normalizeProfileToUser = (profile: UserProfile): User => ({
@@ -55,6 +64,7 @@ const normalizeProfileToUser = (profile: UserProfile): User => ({
   status: profile.status === 'inactive' ? 'inactive' : 'active',
   joinedDate: profile.joinedDate?.split('T')[0] ?? 'Unknown',
   donationCount: profile.donationCount ?? 0,
+  donorLevel: (profile.donorLevel as DonorLevel) || 'Bronze',
 });
 
 export default function AdminUsers() {
@@ -68,6 +78,10 @@ export default function AdminUsers() {
   const [refreshing, setRefreshing] = useState(false);
   const [pendingActionUserId, setPendingActionUserId] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
+  
+  // Donor level modal state
+  const [showDonorLevelModal, setShowDonorLevelModal] = useState(false);
+  const [selectedUserForLevel, setSelectedUserForLevel] = useState<User | null>(null);
 
   // Add user form state
   const [newUser, setNewUser] = useState({
@@ -248,7 +262,38 @@ export default function AdminUsers() {
     );
   };
 
-  const renderUser = ({ item }: { item: User }) => (
+  const openDonorLevelModal = (user: User) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedUserForLevel(user);
+    setShowDonorLevelModal(true);
+  };
+
+  const handleChangeDonorLevel = async (level: DonorLevel) => {
+    if (!selectedUserForLevel) return;
+    
+    try {
+      setPendingActionUserId(selectedUserForLevel.id);
+      const updatedUser = await updateAdminUserProfile(selectedUserForLevel.id, { donorLevel: level });
+      setUsers((prev) =>
+        prev.map((existingUser) =>
+          existingUser.id === selectedUserForLevel.id ? normalizeProfileToUser(updatedUser) : existingUser,
+        ),
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowDonorLevelModal(false);
+      setSelectedUserForLevel(null);
+    } catch (error) {
+      console.error('Failed to update donor level:', error);
+      Alert.alert('Error', 'Unable to update donor level. Please try again.');
+    } finally {
+      setPendingActionUserId(null);
+    }
+  };
+
+  const renderUser = ({ item }: { item: User }) => {
+    const levelColors = DONOR_LEVEL_COLORS[item.donorLevel];
+    
+    return (
     <View style={styles.userCard}>
       <View style={styles.userHeader}>
         <View style={styles.avatarContainer}>
@@ -265,6 +310,13 @@ export default function AdminUsers() {
             <View style={[styles.statusBadge, item.status === 'active' ? styles.activeBadge : styles.inactiveBadge]}>
               <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
             </View>
+            <TouchableOpacity 
+              style={[styles.donorLevelBadge, { backgroundColor: levelColors.bg }]}
+              onPress={() => openDonorLevelModal(item)}
+            >
+              <Ionicons name="ribbon" size={12} color={levelColors.text} />
+              <Text style={[styles.donorLevelText, { color: levelColors.text }]}>{item.donorLevel}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -312,7 +364,8 @@ export default function AdminUsers() {
         </TouchableOpacity>
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -681,6 +734,71 @@ export default function AdminUsers() {
                 <Text style={styles.doneModalButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Donor Level Modal */}
+      <Modal
+        visible={showDonorLevelModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowDonorLevelModal(false)}
+      >
+        <View style={styles.donorLevelModalOverlay}>
+          <View style={styles.donorLevelModalContent}>
+            <View style={styles.donorLevelModalHeader}>
+              <Text style={styles.donorLevelModalTitle}>Change Donor Level</Text>
+              <TouchableOpacity onPress={() => setShowDonorLevelModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedUserForLevel && (
+              <Text style={styles.donorLevelModalSubtitle}>
+                Select level for {selectedUserForLevel.name}
+              </Text>
+            )}
+
+            <View style={styles.donorLevelOptions}>
+              {(['Bronze', 'Silver', 'Gold'] as DonorLevel[]).map((level) => {
+                const colors = DONOR_LEVEL_COLORS[level];
+                const isSelected = selectedUserForLevel?.donorLevel === level;
+                
+                return (
+                  <TouchableOpacity
+                    key={level}
+                    style={[
+                      styles.donorLevelOption,
+                      { backgroundColor: colors.bg },
+                      isSelected && styles.donorLevelOptionSelected,
+                    ]}
+                    onPress={() => handleChangeDonorLevel(level)}
+                    disabled={pendingActionUserId === selectedUserForLevel?.id}
+                  >
+                    <LinearGradient
+                      colors={colors.gradient}
+                      style={styles.donorLevelIconWrapper}
+                    >
+                      <Ionicons name="ribbon" size={24} color="#fff" />
+                    </LinearGradient>
+                    <Text style={[styles.donorLevelOptionText, { color: colors.text }]}>
+                      {level}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={24} color={colors.text} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={styles.donorLevelCancelButton}
+              onPress={() => setShowDonorLevelModal(false)}
+            >
+              <Text style={styles.donorLevelCancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1179,5 +1297,85 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#111827',
+  },
+  // Donor Level Badge styles
+  donorLevelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  donorLevelText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  // Donor Level Modal styles
+  donorLevelModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  donorLevelModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+  },
+  donorLevelModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  donorLevelModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  donorLevelModalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  donorLevelOptions: {
+    gap: 12,
+  },
+  donorLevelOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+  },
+  donorLevelOptionSelected: {
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+  },
+  donorLevelIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donorLevelOptionText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  donorLevelCancelButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  donorLevelCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
 });
