@@ -49,7 +49,6 @@ export default function SettingsPanel() {
   const [urgentAlerts, setUrgentAlerts] = useState(true);
   const [reminders, setReminders] = useState(false);
   const [notifyEmail, setNotifyEmail] = useState(true);
-  const [notifySMS, setNotifySMS] = useState(false);
   const [notifyPush, setNotifyPush] = useState(true);
 
   // Accessibility
@@ -226,15 +225,6 @@ export default function SettingsPanel() {
     },
     {
       id: '5',
-      title: t('sms'),
-      subtitle: 'SMS notifications',
-      icon: 'chatbox',
-      type: 'toggle',
-      value: notifySMS,
-      action: () => setNotifySMS(!notifySMS),
-    },
-    {
-      id: '6',
       title: t('push'),
       subtitle: 'Push notifications',
       icon: 'phone-portrait',

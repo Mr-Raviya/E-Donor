@@ -280,7 +280,7 @@ export default function AdminHospitals() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.deleteBtn]}
-          onPress={() => handleDeleteHospital(item.id)}
+          onPress={() => item.id && handleDeleteHospital(item.id)}
         >
           <Ionicons name="trash" size={20} color="#DC2626" />
           <Text style={[styles.actionBtnText, styles.deleteBtnText]}>Delete</Text>
