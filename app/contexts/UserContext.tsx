@@ -6,6 +6,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
 } from 'firebase/auth';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
@@ -31,6 +32,7 @@ interface UserContextType {
     fullName?: string,
     profileExtras?: Partial<UserProfile>,
   ) => Promise<void>;
+  resendVerificationEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -133,8 +135,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
 
         try {
-          setSession(firebaseUser);
           if (firebaseUser?.uid) {
+            try {
+              // Refresh user to get the latest verification status
+              await firebaseUser.reload();
+            } catch (reloadError) {
+              console.error('Failed to reload user state:', reloadError);
+            }
+
+            if (!firebaseUser.emailVerified) {
+              // Enforce email verification before allowing session
+              await firebaseSignOut(auth);
+              setSession(null);
+              setUser(defaultUser);
+              await AsyncStorage.removeItem(USER_STORAGE_KEY);
+              setLoading(false);
+              return;
+            }
+
+            setSession(firebaseUser);
             await syncProfileWithBackend(firebaseUser.uid, {
               email: firebaseUser.email ?? undefined,
               name: firebaseUser.displayName ?? defaultUser.name,
@@ -202,22 +221,57 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const signInWithPassword = useCallback(
     async (email: string, password: string) => {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      if (credential.user?.uid) {
+      const firebaseUser = credential.user;
+
+      if (firebaseUser?.uid) {
+        try {
+          await firebaseUser.reload();
+        } catch (reloadError) {
+          console.error('Failed to reload user during sign in:', reloadError);
+        }
+
+        if (!firebaseUser.emailVerified) {
+          try {
+            await sendEmailVerification(firebaseUser);
+          } catch (verificationError) {
+            console.error('Failed to send verification email on sign in:', verificationError);
+          }
+          await firebaseSignOut(auth);
+          const verificationError: any = new Error(
+            'Please verify your email before signing in. We sent a verification link to your inbox.',
+          );
+          verificationError.code = 'auth/email-not-verified';
+          throw verificationError;
+        }
         // Check if user account is deactivated
-        const userProfile = await fetchUserProfile(credential.user.uid);
+        const userProfile = await fetchUserProfile(firebaseUser.uid);
         if (userProfile?.status === 'inactive') {
           await firebaseSignOut(auth);
           throw new Error('Your account has been deactivated. Please contact support.');
         }
         
-        await syncProfileWithBackend(credential.user.uid, {
-          email: credential.user.email ?? email,
-          name: credential.user.displayName ?? defaultUser.name,
+        await syncProfileWithBackend(firebaseUser.uid, {
+          email: firebaseUser.email ?? email,
+          name: firebaseUser.displayName ?? defaultUser.name,
         });
       }
     },
     [syncProfileWithBackend],
   );
+
+  const resendVerificationEmail = useCallback(async (email: string, password: string) => {
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = credential.user;
+
+      if (!firebaseUser.emailVerified) {
+        await sendEmailVerification(firebaseUser);
+      }
+    } finally {
+      // Always sign out to avoid leaving an unverified session around
+      await firebaseSignOut(auth);
+    }
+  }, []);
 
   const signUpWithPassword = useCallback(
     async (email: string, password: string, fullName?: string, profileExtras?: Partial<UserProfile>) => {
@@ -227,6 +281,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const firebaseUser = credential.user;
         
         if (firebaseUser) {
+          try {
+            console.log('✉️ Sending email verification...');
+            await sendEmailVerification(firebaseUser);
+          } catch (verificationError) {
+            console.error('❌ Failed to send verification email:', verificationError);
+          }
+
           console.log('✅ User created with UID:', firebaseUser.uid);
           
           if (fullName) {
@@ -242,6 +303,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           });
           
           console.log('✅ Sign up completed successfully!');
+
+          // Sign out to enforce verification before first login
+          await firebaseSignOut(auth);
+          setSession(null);
+          setUser(defaultUser);
+          await AsyncStorage.removeItem(USER_STORAGE_KEY);
         }
       } catch (error) {
         console.error('❌ Sign up error:', error);
@@ -270,6 +337,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         updateProfilePicture,
         signInWithPassword,
+        resendVerificationEmail,
         signUpWithPassword,
         signOut,
       }}

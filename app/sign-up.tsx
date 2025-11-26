@@ -942,7 +942,9 @@ export default function SignUpScreen() {
           <View style={styles.modalCard}>
             <Ionicons name="checkmark-circle" size={48} color="#22C55E" style={{ marginBottom: 12 }} />
             <Text style={styles.modalTitle}>Account Created</Text>
-            <Text style={styles.modalMessage}>Sign up was successful. You can log in now.</Text>
+            <Text style={styles.modalMessage}>
+              Sign up was successful. Please check your email and verify your account before signing in.
+            </Text>
             <TouchableOpacity
               style={[styles.primaryButton, styles.modalPrimary]}
               activeOpacity={0.9}

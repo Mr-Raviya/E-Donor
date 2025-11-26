@@ -1,8 +1,12 @@
 {
   "expo": {
     "name": "E-Donor",
-    "slug": "E-Donor",
+    "slug": "e-donor",
     "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "edonor",
@@ -11,10 +15,11 @@
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
-      "statusBarStyle": "dark",
       "userInterfaceStyle": "light",
       "infoPlist": {
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIStatusBarStyle": "UIStatusBarStyleDarkContent"
       },
       "bundleIdentifier": "com.mrraviya.EDonor"
     },
@@ -28,16 +33,16 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "statusBar": {
-        "barStyle": "dark-content",
-        "translucent": true
-      },
-      "navigationBar": {
-        "visible": false,
-        "backgroundColor": "#000000"
-      },
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.mrraviya.EDonor"
+    },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "visible": "immersive",
+      "backgroundColor": "#000000"
     },
     "plugins": [
       "expo-router",
@@ -86,7 +91,7 @@
         "visibility": "hidden"
       },
       "eas": {
-        "projectId": "0f4e42d6-d031-4043-826a-59af581bcf34"
+        "projectId": "b0a1fd12-d027-4b7e-b7dc-0cf139114c38"
       },
       "firebase": {
         "apiKey": "AIzaSyD7mFH0jX9SoxH1JCzXfWu9daPBjzTSBdU",
@@ -96,6 +101,7 @@
         "messagingSenderId": "326352899654",
         "appId": "1:326352899654:web:6aa651d308c8a06e1e8447"
       }
-    }
+    },
+    "owner": "mrraviya"
   }
 }

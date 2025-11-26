@@ -38,7 +38,7 @@ const RESET_MODAL_OFFSCREEN = Dimensions.get('window').height;
 export default function SignInScreen() {
   const router = useRouter();
   const { refreshAdminStatus } = useAdmin();
-  const { signInWithPassword } = useUser();
+  const { signInWithPassword, resendVerificationEmail } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secureEntry, setSecureEntry] = useState(true);
@@ -53,6 +53,12 @@ export default function SignInScreen() {
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorCode, setErrorCode] = useState<string | undefined>(undefined);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationSentMessage, setVerificationSentMessage] = useState<string | undefined>(
+    undefined,
+  );
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [resetSuccessVisible, setResetSuccessVisible] = useState(false);
   const signInShake = useRef(new Animated.Value(0)).current;
   const resetShake = useRef(new Animated.Value(0)).current;
@@ -107,6 +113,8 @@ export default function SignInScreen() {
 
     setErrors({});
     setErrorModalVisible(false);
+    setVerificationSentMessage(undefined);
+    setErrorCode(undefined);
     setSigningIn(true);
 
     try {
@@ -120,8 +128,13 @@ export default function SignInScreen() {
       const errorCode = error?.code;
       const errorMsg = error?.message || '';
       const normalizedMessage = errorMsg.toLowerCase();
+        setErrorCode(errorCode);
       if (errorCode === 'auth/network-request-failed' || normalizedMessage.includes('network request failed')) {
         setErrorMessage('Please check your internet connection and try again.');
+      } else if (errorCode === 'auth/email-not-verified' || normalizedMessage.includes('verify your email')) {
+        setErrorMessage(
+          'Please verify your email to continue. We just sent a verification link to your inbox.',
+        );
       } else if (normalizedMessage.includes('deactivated')) {
         setErrorMessage('Your account has been deactivated. Please contact support for assistance.');
       } else if (
@@ -134,6 +147,32 @@ export default function SignInScreen() {
         setErrorMessage('Unable to sign in. Please check your credentials and try again.');
       }
       setErrorModalVisible(true);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (resendingVerification || verificationCooldown > 0 || !email || !password) {
+      if (verificationCooldown > 0) {
+        setVerificationSentMessage(`Please wait ${verificationCooldown}s before resending.`);
+      }
+      return;
+    }
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    setResendingVerification(true);
+    setVerificationSentMessage(undefined);
+    
+    try {
+      await resendVerificationEmail(trimmedEmail, trimmedPassword);
+      setVerificationSentMessage('Verification link resent. Please check your inbox.');
+      setVerificationCooldown(60);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (resendError) {
+      console.error('Failed to resend verification email:', resendError);
+      setVerificationSentMessage('Unable to resend verification email. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -219,6 +258,29 @@ export default function SignInScreen() {
       resetModalTranslate.setValue(RESET_MODAL_OFFSCREEN);
     });
   }, [resetModalTranslate]);
+
+  const closeErrorModal = useCallback(() => {
+    setErrorModalVisible(false);
+    setVerificationSentMessage(undefined);
+    setErrorCode(undefined);
+    setVerificationCooldown(0);
+  }, []);
+
+  useEffect(() => {
+    if (verificationCooldown <= 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setVerificationCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [verificationCooldown]);
 
   const resetModalPanResponder = useMemo(
     () =>
@@ -416,20 +478,44 @@ export default function SignInScreen() {
           animationType="fade"
           transparent
           visible={errorModalVisible}
-          onRequestClose={() => setErrorModalVisible(false)}
+          onRequestClose={closeErrorModal}
         >
           <View style={styles.authErrorOverlay}>
             <View style={styles.authErrorCard}>
               <Ionicons name="alert-circle" size={40} color="#DC2626" style={{ marginBottom: 12 }} />
               <Text style={styles.authErrorTitle}>Authentication Failed</Text>
               <Text style={styles.authErrorMessage}>{errorMessage}</Text>
-              <TouchableOpacity
-                style={styles.authErrorButton}
-                onPress={() => setErrorModalVisible(false)}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.authErrorButtonText}>Retry</Text>
-              </TouchableOpacity>
+              {errorCode === 'auth/email-not-verified' ? (
+                <>
+                  {verificationSentMessage ? (
+                    <Text style={styles.authInfoMessage}>{verificationSentMessage}</Text>
+                  ) : null}
+                  <TouchableOpacity
+                    style={[styles.authErrorButton, styles.authSecondaryButton]}
+                    onPress={handleResendVerification}
+                    activeOpacity={0.9}
+                    disabled={resendingVerification || verificationCooldown > 0}
+                  >
+                    {resendingVerification ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.authSecondaryButtonText}>
+                        {verificationCooldown > 0
+                          ? `Resend in ${verificationCooldown}s`
+                          : 'Resend Verification Email'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.authErrorButton}
+                  onPress={closeErrorModal}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.authErrorButtonText}>Retry</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </Modal>
@@ -612,6 +698,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  authInfoMessage: {
+    fontSize: 13,
+    color: '#16A34A',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   authErrorButton: {
     backgroundColor: '#DC2626',
     paddingHorizontal: 32,
@@ -628,6 +720,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
     letterSpacing: 0.3,
+  },
+  authSecondaryButton: {
+    backgroundColor: '#DC2626',
+    marginBottom: 10,
+    shadowOpacity: 0.3,
+    shadowColor: '#DC2626',
+  },
+  authSecondaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   formCard: {
     backgroundColor: 'white',
