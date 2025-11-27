@@ -23,6 +23,7 @@ import { useHaptics } from './contexts/HapticsContext';
 import { useLocalization } from './contexts/LocalizationContext';
 import { useUser } from './contexts/UserContext';
 import { DonationRequest, listenToDonationRequests } from './services/donationRequestService';
+import { listenToUserDonations, UserDonation } from './services/userDonationService';
 
 type UrgencyLevel = 'Critical' | 'Urgent' | 'Moderate' | 'Normal';
 
@@ -155,6 +156,26 @@ const mapDonationRequestToCard = (request: DonationRequest): RequestCard => ({
   timeAgo: formatTimeAgo(request.createdAt),
 });
 
+const getDonationStatusConfig = (status: UserDonation['status']) => {
+  switch (status) {
+    case 'pending':
+      return { label: 'Pending', color: '#F59E0B', bg: '#FEF3C7', icon: 'time-outline' as const };
+    case 'scheduled':
+      return { label: 'Scheduled', color: '#2563EB', bg: '#DBEAFE', icon: 'calendar-outline' as const };
+    case 'completed':
+      return { label: 'Completed', color: '#16A34A', bg: '#DCFCE7', icon: 'checkmark-circle' as const };
+    case 'cancelled':
+      return { label: 'Cancelled', color: '#EF4444', bg: '#FEE2E2', icon: 'close-circle-outline' as const };
+    default:
+      return { label: 'Pending', color: '#F59E0B', bg: '#FEF3C7', icon: 'time-outline' as const };
+  }
+};
+
+const formatDonationDate = (date?: Date | null): string => {
+  if (!date) return 'Just now';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 const tabs = [
   { key: 'requests', label: 'Find Requests' },
   { key: 'donations', label: 'My Donations' },
@@ -162,34 +183,10 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]['key'];
 
-const donations = [
-  {
-    id: 'd1',
-    facility: 'Lanka Hospitals',
-    caseType: 'Emergency Surgery',
-    units: 1,
-    date: '2025-08-15',
-  },
-  {
-    id: 'd2',
-    facility: 'National Blood Centre',
-    caseType: 'Cancer Patient',
-    units: 1,
-    date: '2025-06-20',
-  },
-  {
-    id: 'd3',
-    facility: 'Nawaloka Hospital',
-    caseType: 'Accident Victim',
-    units: 1,
-    date: '2025-04-10',
-  },
-] as const;
-
 export default function HomeScreen() {
   const { t, locale } = useLocalization();
   const { themeMode } = useAppearance();
-  const { user } = useUser();
+  const { user, session } = useUser();
   const userBloodType = (user.bloodType || '').trim();
   const isDark = themeMode === 'dark';
   const donationCount = user.donationCount ?? 0;
@@ -199,6 +196,9 @@ export default function HomeScreen() {
   const [requestCards, setRequestCards] = useState<RequestCard[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [donations, setDonations] = useState<UserDonation[]>([]);
+  const [loadingDonations, setLoadingDonations] = useState(true);
+  const [donationError, setDonationError] = useState<string | null>(null);
   const activeCount = useMemo(() => requestCards.length, [requestCards]);
   const router = useRouter();
   const unreadCount = useUnreadNotifications();
@@ -261,6 +261,31 @@ export default function HomeScreen() {
 
     return () => unsubscribe();
   }, [userBloodType]);
+
+  useEffect(() => {
+    if (!session?.uid) {
+      setDonations([]);
+      setLoadingDonations(false);
+      return;
+    }
+
+    setLoadingDonations(true);
+    const unsubscribe = listenToUserDonations(
+      session.uid,
+      (items) => {
+        setDonations(items);
+        setDonationError(null);
+        setLoadingDonations(false);
+      },
+      (error) => {
+        console.error('Error loading user donations:', error);
+        setDonationError('Unable to load your donations right now.');
+        setLoadingDonations(false);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [session?.uid]);
 
   useEffect(() => {
     const checkTerms = async () => {
@@ -376,7 +401,7 @@ export default function HomeScreen() {
                       styles.donorLevelBadgeText,
                       { color: isDark ? levelConfig.textDark : levelConfig.textLight }
                     ]}>
-                      {levelConfig.label} Donor
+                      {levelConfig.label}
                     </Text>
                   </View>
                   <View style={styles.appleDivider} />
@@ -573,35 +598,63 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.donationList}>
-              {donations.map((donation, index) => (
-                <TouchableOpacity key={donation.id} style={styles.donationCard} activeOpacity={0.9}>
-                  <View style={styles.donationIconContainer}>
-                    <LinearGradient
-                      colors={['#DCFCE7', '#BBF7D0']}
-                      style={styles.donationIconBg}
-                    >
-                      <Ionicons name="heart" size={22} color="#16A34A" />
-                    </LinearGradient>
-                  </View>
-                  <View style={styles.donationContent}>
-                    <Text style={styles.donationFacility}>{donation.facility}</Text>
-                    <Text style={styles.donationCase}>{donation.caseType}</Text>
-                    <View style={styles.donationFooter}>
-                      <View style={styles.donationMetaItem}>
-                        <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
-                        <Text style={styles.donationDate}>{donation.date}</Text>
+              {loadingDonations ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator color="#DC2626" />
+                  <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>Loading donations...</Text>
+                </View>
+              ) : donationError ? (
+                <View style={styles.loadingState}>
+                  <Text style={styles.errorText}>{donationError}</Text>
+                </View>
+              ) : donations.length === 0 ? (
+                <View style={styles.loadingState}>
+                  <Ionicons name="hourglass-outline" size={28} color="#9CA3AF" />
+                  <Text style={[styles.sectionSubtitle, { marginTop: 6 }]}>No donations yet</Text>
+                </View>
+              ) : (
+                donations.map((donation) => {
+                  const status = getDonationStatusConfig(donation.status);
+                  return (
+                    <TouchableOpacity key={donation.id} style={styles.donationCard} activeOpacity={0.9}>
+                      <View style={styles.donationIconContainer}>
+                        <LinearGradient
+                          colors={['#DCFCE7', '#BBF7D0']}
+                          style={styles.donationIconBg}
+                        >
+                          <Ionicons name="heart" size={22} color="#16A34A" />
+                        </LinearGradient>
                       </View>
-                      <View style={styles.donationMetaItem}>
-                        <Ionicons name="water" size={12} color="#9CA3AF" />
-                        <Text style={styles.donationUnits}>{donation.units} unit</Text>
+                      <View style={styles.donationContent}>
+                        <View style={styles.donationHeaderRow}>
+                          <Text style={styles.donationFacility} numberOfLines={1}>{donation.hospital}</Text>
+                          <View style={[styles.donationStatusPill, { backgroundColor: status.bg }]}>
+                            <Ionicons name={status.icon} size={12} color={status.color} />
+                            <Text style={[styles.donationStatusText, { color: status.color }]}>{status.label}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.donationCase} numberOfLines={1}>
+                          {donation.medicalCondition || 'Blood donation'}
+                        </Text>
+                        <View style={styles.donationFooter}>
+                          <View style={styles.donationMetaItem}>
+                            <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
+                            <Text style={styles.donationDate}>{formatDonationDate(donation.acceptedAt ?? donation.createdAt)}</Text>
+                          </View>
+                          <View style={styles.donationMetaItem}>
+                            <Ionicons name="water" size={12} color="#9CA3AF" />
+                            <Text style={styles.donationUnits}>{donation.units} unit</Text>
+                          </View>
+                          <View style={styles.donationMetaItem}>
+                            <Ionicons name="location-outline" size={12} color="#9CA3AF" />
+                            <Text style={styles.donationDate} numberOfLines={1}>{donation.location}</Text>
+                          </View>
+                        </View>
                       </View>
-                    </View>
-                  </View>
-                  <View style={styles.successBadge}>
-                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
-                  </View>
-                </TouchableOpacity>
-              ))}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </View>
           </>
         )}
@@ -697,7 +750,7 @@ export default function HomeScreen() {
             </View>
             
             <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#111827' }]}>
-              {levelConfig.label} Donor
+              {levelConfig.label}
             </Text>
             <Text style={[styles.donorModalSubtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
               {donationCount} {donationCount === 1 ? 'donation' : 'donations'} completed
@@ -1228,6 +1281,12 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
     paddingVertical: 24,
     gap: 6,
   },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
   emptyIcon: {
     width: 48,
     height: 48,
@@ -1422,6 +1481,12 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
   donationContent: {
     flex: 1,
   },
+  donationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   donationFacility: {
     fontSize: baseFontSize + 2,
     fontWeight: '700',
@@ -1441,6 +1506,18 @@ const createStyles = (isDark: boolean, locale: 'en' | 'si' | 'ta') => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  donationStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+  },
+  donationStatusText: {
+    fontSize: baseFontSize - 2,
+    fontWeight: '700',
   },
   donationDate: {
     fontSize: baseFontSize - 2,

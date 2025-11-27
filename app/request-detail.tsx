@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
 import { useUser } from './contexts/UserContext';
 import { acceptDonationRequest, DonationRequest, fetchDonationRequestById } from './services/donationRequestService';
+import { createUserDonation } from './services/userDonationService';
 
 const normalizeUrgencyLabel = (value?: string) => {
   const normalized = (value || '').toLowerCase();
@@ -68,7 +69,7 @@ const formatRequiredBy = (value?: string): string => {
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { themeMode } = useAppearance();
-  const { user } = useUser();
+  const { user, session } = useUser();
   const isDark = themeMode === 'dark';
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -100,12 +101,11 @@ export default function RequestDetailScreen() {
         } else {
           setRequest(data);
           setError(null);
-          // Check if user has already accepted this request
-          if (data.acceptedBy && user && data.acceptedBy === user.uid) {
-            setAcceptanceStatus('pending');
-          } else if (data.status === 'pending' || data.status === 'accepted') {
-            // Someone else accepted or it's already in progress
-            setAcceptanceStatus(data.status as 'pending' | 'accepted');
+          // Only show accepted if the current user already accepted this request
+          if (data.acceptedBy && session?.uid && data.acceptedBy === session.uid) {
+            setAcceptanceStatus('accepted');
+          } else {
+            setAcceptanceStatus('idle');
           }
         }
       })
@@ -124,10 +124,10 @@ export default function RequestDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [requestId, user]);
+  }, [requestId, session?.uid, user]);
 
   const handleAcceptRequest = async () => {
-    if (!requestId || !user || !request) {
+    if (!requestId || !user || !request || !session?.uid) {
       Alert.alert('Error', 'Unable to accept request. Please try again.');
       return;
     }
@@ -139,7 +139,7 @@ export default function RequestDetailScreen() {
       // Update the donation request status
       await acceptDonationRequest(
         requestId,
-        user.uid,
+        session.uid,
         user.displayName || user.name || 'Anonymous Donor',
         user.phone || '',
         user.bloodType || ''
@@ -147,7 +147,7 @@ export default function RequestDetailScreen() {
       
       // Create a donation record in user's donation history
       await createUserDonation({
-        donorId: user.uid,
+        donorId: session.uid,
         donorName: user.displayName || user.name || 'Anonymous Donor',
         donorPhone: user.phone || '',
         donorBloodType: user.bloodType || '',
@@ -163,7 +163,7 @@ export default function RequestDetailScreen() {
         notes: request.notes || '',
       });
       
-      setAcceptanceStatus('pending');
+      setAcceptanceStatus('accepted');
       setShowAcceptModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
@@ -375,11 +375,11 @@ export default function RequestDetailScreen() {
         </ScrollView>
 
         <View style={styles.footerActions}>
-          {acceptanceStatus === 'pending' ? (
+          {acceptanceStatus === 'accepted' ? (
             <View style={[styles.acceptButton, styles.pendingButton]}>
-              <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
               <Text style={styles.acceptButtonText} numberOfLines={1}>
-                Pending
+                Accepted
               </Text>
             </View>
           ) : isSubmitting ? (

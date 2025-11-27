@@ -160,7 +160,7 @@ export const acceptDonationRequest = async (
 ): Promise<void> => {
   if (!requestId || !donorId) return;
   await updateDoc(doc(donationRequestsCollection, requestId), {
-    status: 'pending',
+    status: 'accepted',
     acceptedBy: donorId,
     acceptedByName: donorName,
     acceptedByPhone: donorPhone,

@@ -44,20 +44,20 @@ export default function DonationHistoryScreen() {
   const router = useRouter();
   const { t } = useLocalization();
   const { themeMode } = useAppearance();
-  const { user } = useUser();
+  const { session } = useUser();
   const isDark = themeMode === 'dark';
   const [selectedDonation, setSelectedDonation] = useState<string | null>(null);
   const [donations, setDonations] = useState<UserDonation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) {
+    if (!session?.uid) {
       setLoading(false);
       return;
     }
 
     const unsubscribe = listenToUserDonations(
-      user.uid,
+      session.uid,
       (data) => {
         setDonations(data);
         setLoading(false);
@@ -69,7 +69,7 @@ export default function DonationHistoryScreen() {
     );
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [session?.uid]);
 
   const completedCount = donations.filter(d => d.status === 'completed').length;
   const pendingCount = donations.filter(d => d.status === 'pending').length;
