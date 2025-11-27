@@ -1,18 +1,18 @@
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    Timestamp,
-    updateDoc,
-    where
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 
@@ -159,39 +159,64 @@ const getTargetUserIds = async (targetAudience: TargetAudience): Promise<string[
     console.log(`🔍 Getting target user IDs for audience: ${targetAudience}`);
     
     if (targetAudience === 'all') {
-      // Get all users
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const userIds = usersSnapshot.docs.map((doc) => doc.id);
-      console.log(`✅ Found ${userIds.length} users for 'all' audience`);
+      // Get all users from profiles collection
+      const profilesSnapshot = await getDocs(collection(db, 'profiles'));
+      const userIds = profilesSnapshot.docs.map((doc) => doc.id);
+      console.log(`✅ Found ${userIds.length} users for 'all' audience from profiles`);
       
+      // Also check users collection as fallback
       if (userIds.length === 0) {
-        console.warn('⚠️ No users found in users collection! Please create user documents.');
+        console.log('🔍 No profiles found, checking users collection...');
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const fallbackIds = usersSnapshot.docs.map((doc) => doc.id);
+        console.log(`✅ Found ${fallbackIds.length} users from users collection`);
+        return fallbackIds;
       }
       
       return userIds;
     } else if (targetAudience === 'donors') {
-      // Get users with role 'donor'
-      const q = query(collection(db, 'users'), where('role', '==', 'donor'));
-      const snapshot = await getDocs(q);
-      const userIds = snapshot.docs.map((doc) => doc.id);
-      console.log(`✅ Found ${userIds.length} donors`);
+      // Get users with role 'donor' - check profiles first, then users
+      let userIds: string[] = [];
+      
+      // Try profiles collection
+      const profilesSnapshot = await getDocs(collection(db, 'profiles'));
+      userIds = profilesSnapshot.docs
+        .filter((doc) => {
+          const data = doc.data();
+          return data.role === 'donor' || data.user_type === 'donor' || !data.role; // Default to donor if no role
+        })
+        .map((doc) => doc.id);
       
       if (userIds.length === 0) {
-        console.warn('⚠️ No donors found! Make sure users have role="donor"');
+        // Fallback to users collection
+        const q = query(collection(db, 'users'), where('role', '==', 'donor'));
+        const snapshot = await getDocs(q);
+        userIds = snapshot.docs.map((doc) => doc.id);
       }
       
+      console.log(`✅ Found ${userIds.length} donors`);
       return userIds;
     } else if (targetAudience === 'recipients') {
       // Get users with role 'recipient'
-      const q = query(collection(db, 'users'), where('role', '==', 'recipient'));
-      const snapshot = await getDocs(q);
-      const userIds = snapshot.docs.map((doc) => doc.id);
-      console.log(`✅ Found ${userIds.length} recipients`);
+      let userIds: string[] = [];
+      
+      // Try profiles collection
+      const profilesSnapshot = await getDocs(collection(db, 'profiles'));
+      userIds = profilesSnapshot.docs
+        .filter((doc) => {
+          const data = doc.data();
+          return data.role === 'recipient' || data.user_type === 'recipient';
+        })
+        .map((doc) => doc.id);
       
       if (userIds.length === 0) {
-        console.warn('⚠️ No recipients found! Make sure users have role="recipient"');
+        // Fallback to users collection
+        const q = query(collection(db, 'users'), where('role', '==', 'recipient'));
+        const snapshot = await getDocs(q);
+        userIds = snapshot.docs.map((doc) => doc.id);
       }
       
+      console.log(`✅ Found ${userIds.length} recipients`);
       return userIds;
     }
     return [];
@@ -212,17 +237,20 @@ export const listenToUserNotifications = (
   onError?: (error: Error) => void
 ): (() => void) => {
   try {
+    console.log(`🔔 Setting up notifications listener for user: ${userId}`);
+    
+    // Simple query - just filter by userId, sort in memory
     const q = query(
       collection(db, USER_NOTIFICATIONS_COLLECTION),
-      where('userId', '==', userId),
-      orderBy('receivedAt', 'desc'),
-      limit(50)
+      where('userId', '==', userId)
     );
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        console.log(`📬 User ${userId}: Received ${snapshot.docs.length} notifications`);
+        
         const notifications: UserNotification[] = snapshot.docs
           .filter((doc) => {
             const data = doc.data();
@@ -244,12 +272,19 @@ export const listenToUserNotifications = (
               receivedAt: data.receivedAt,
               metadata: data.metadata || {},
             } as UserNotification;
-          });
+          })
+          // Sort by receivedAt descending (newest first)
+          .sort((a, b) => {
+            const timeA = a.receivedAt?.toDate?.()?.getTime?.() || 0;
+            const timeB = b.receivedAt?.toDate?.()?.getTime?.() || 0;
+            return timeB - timeA;
+          })
+          .slice(0, 50); // Limit to 50
 
         onNotificationsUpdate(notifications);
       },
       (error) => {
-        console.error('Error listening to notifications:', error);
+        console.error('❌ Error listening to notifications:', error);
         if (onError) {
           onError(error);
         }
@@ -338,37 +373,102 @@ export const deleteUserNotification = async (
 };
 
 /**
- * Admin: Delete a notification and mark all related user notifications as deleted
+ * Admin: Delete a notification - handles both admin notifications and userNotifications
+ * Since admin dashboard now shows notifications from userNotifications,
+ * the ID could be either a notificationId (from notifications collection)
+ * or a document ID from userNotifications
  */
 export const deleteAdminNotification = async (notificationId: string): Promise<void> => {
   try {
-    // Remove the notification document from the admin collection
-    const notificationRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
-    await deleteDoc(notificationRef);
-
-    // Mark related user notifications as deleted so they disappear from user feeds
-    const relatedUserNotificationsQuery = query(
+    console.log(`🗑️ Deleting notification: ${notificationId}`);
+    
+    // First, try to find all userNotifications with this notificationId
+    const relatedByNotificationIdQuery = query(
       collection(db, USER_NOTIFICATIONS_COLLECTION),
       where('notificationId', '==', notificationId)
     );
-    const relatedUserNotifications = await getDocs(relatedUserNotificationsQuery);
-
+    const relatedByNotificationId = await getDocs(relatedByNotificationIdQuery);
+    
+    let deletedCount = 0;
     const updates: Promise<any>[] = [];
-    relatedUserNotifications.forEach((document) => {
-      updates.push(
-        updateDoc(doc(db, USER_NOTIFICATIONS_COLLECTION, document.id), {
-          deleted: true,
-          deletedAt: serverTimestamp(),
-        })
-      );
-    });
+
+    if (relatedByNotificationId.size > 0) {
+      // Found related notifications - mark them all as deleted
+      console.log(`📋 Found ${relatedByNotificationId.size} related user notifications`);
+      relatedByNotificationId.forEach((document) => {
+        updates.push(
+          updateDoc(doc(db, USER_NOTIFICATIONS_COLLECTION, document.id), {
+            deleted: true,
+            deletedAt: serverTimestamp(),
+          })
+        );
+      });
+      deletedCount = relatedByNotificationId.size;
+    } else {
+      // No related notifications found by notificationId
+      // The ID might be a direct document ID from userNotifications
+      // Try to delete/mark as deleted directly
+      console.log(`📋 No related notifications found, trying direct document ID`);
+      
+      try {
+        const directDocRef = doc(db, USER_NOTIFICATIONS_COLLECTION, notificationId);
+        const directDoc = await getDoc(directDocRef);
+        
+        if (directDoc.exists()) {
+          updates.push(
+            updateDoc(directDocRef, {
+              deleted: true,
+              deletedAt: serverTimestamp(),
+            })
+          );
+          deletedCount = 1;
+          
+          // Also delete any other notifications with same title/message (grouped notifications)
+          const docData = directDoc.data();
+          if (docData.title && docData.message) {
+            const similarQuery = query(collection(db, USER_NOTIFICATIONS_COLLECTION));
+            const allDocs = await getDocs(similarQuery);
+            
+            allDocs.forEach((otherDoc) => {
+              if (otherDoc.id !== notificationId) {
+                const otherData = otherDoc.data();
+                if (otherData.title === docData.title && 
+                    otherData.message === docData.message &&
+                    otherData.deleted !== true) {
+                  updates.push(
+                    updateDoc(doc(db, USER_NOTIFICATIONS_COLLECTION, otherDoc.id), {
+                      deleted: true,
+                      deletedAt: serverTimestamp(),
+                    })
+                  );
+                  deletedCount++;
+                }
+              }
+            });
+          }
+        }
+      } catch (directError) {
+        console.warn('Could not find direct document:', directError);
+      }
+    }
+
+    // Also try to delete from the main notifications collection
+    try {
+      const mainNotificationRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
+      const mainDoc = await getDoc(mainNotificationRef);
+      if (mainDoc.exists()) {
+        await deleteDoc(mainNotificationRef);
+        console.log(`🗑️ Deleted from main notifications collection`);
+      }
+    } catch (mainError) {
+      // It's okay if this fails - notification might not exist in main collection
+      console.log('Notification not found in main collection (this is okay)');
+    }
 
     await Promise.all(updates);
-    console.log(
-      `Deleted admin notification ${notificationId} and marked ${updates.length} user notifications as deleted`
-    );
+    console.log(`✅ Successfully deleted/marked ${deletedCount} notifications as deleted`);
   } catch (error) {
-    console.error('Error deleting admin notification:', error);
+    console.error('❌ Error deleting admin notification:', error);
     throw error;
   }
 };
@@ -471,53 +571,121 @@ export const getAdminNotifications = async (): Promise<any[]> => {
 
 /**
  * Real-time listener for admin notifications dashboard
+ * Shows all notifications - both from admin panel and from userNotifications
  */
 export const listenToAdminNotifications = (
   onNotificationsUpdate: (notifications: any[]) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
   try {
-    const q = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
-      orderBy('sentDate', 'desc'),
-      limit(50)
-    );
+    console.log('🔔 Setting up admin notifications listener...');
+    
+    // Listen to userNotifications collection to get all notifications including hospital messages
+    const userNotificationsRef = collection(db, USER_NOTIFICATIONS_COLLECTION);
 
     const unsubscribe = onSnapshot(
-      q,
+      userNotificationsRef,
       async (snapshot) => {
-        const notifications = await Promise.all(
-          snapshot.docs.map(async (document) => {
+        console.log(`📬 Received ${snapshot.docs.length} user notifications from Firestore`);
+        
+        if (snapshot.docs.length === 0) {
+          console.log('ℹ️ No notifications found in userNotifications collection');
+          onNotificationsUpdate([]);
+          return;
+        }
+        
+        try {
+          // Group notifications by notificationId or by title+message (for unique identification)
+          const notificationMap = new Map<string, {
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            targetAudience: string;
+            sentDate: string;
+            sentBy: string;
+            totalSent: number;
+            readCount: number;
+            _timestamp: number;
+          }>();
+
+          for (const document of snapshot.docs) {
             const data = document.data();
+            
+            // Skip deleted notifications
+            if (data.deleted === true) continue;
+            
+            // Use notificationId if available, otherwise create a unique key
+            const groupKey = data.notificationId || `${data.title}_${data.message}`.substring(0, 100);
+            
+            // Handle different date formats
+            let sentDateStr = 'N/A';
+            let sentDateTimestamp = 0;
+            const dateField = data.receivedAt || data.sentDate || data.createdAt;
+            
+            if (dateField) {
+              if (dateField.toDate) {
+                const date = dateField.toDate();
+                sentDateStr = date.toISOString().split('T')[0];
+                sentDateTimestamp = date.getTime();
+              } else if (dateField instanceof Date) {
+                sentDateStr = dateField.toISOString().split('T')[0];
+                sentDateTimestamp = dateField.getTime();
+              } else if (typeof dateField === 'string') {
+                sentDateStr = dateField.split('T')[0];
+                sentDateTimestamp = new Date(dateField).getTime();
+              }
+            }
 
-            // Get stats
-            const statsQuery = query(
-              collection(db, USER_NOTIFICATIONS_COLLECTION),
-              where('notificationId', '==', document.id)
-            );
-            const statsSnapshot = await getDocs(statsQuery);
+            if (notificationMap.has(groupKey)) {
+              // Update existing entry - increment counts
+              const existing = notificationMap.get(groupKey)!;
+              existing.totalSent += 1;
+              if (data.read === true) {
+                existing.readCount += 1;
+              }
+              // Keep the latest timestamp
+              if (sentDateTimestamp > existing._timestamp) {
+                existing._timestamp = sentDateTimestamp;
+                existing.sentDate = sentDateStr;
+              }
+            } else {
+              // Create new entry
+              notificationMap.set(groupKey, {
+                id: data.notificationId || document.id,
+                title: data.title || 'Untitled',
+                message: data.message || '',
+                type: data.type || 'general',
+                targetAudience: data.targetAudience || 'all',
+                sentDate: sentDateStr,
+                sentBy: data.sentBy || 'System',
+                totalSent: 1,
+                readCount: data.read === true ? 1 : 0,
+                _timestamp: sentDateTimestamp,
+              });
+            }
+          }
 
-            const totalSent = statsSnapshot.size;
-            const readCount = statsSnapshot.docs.filter((doc) => doc.data().read === true).length;
+          // Convert map to array and sort by date descending
+          const notifications = Array.from(notificationMap.values())
+            .sort((a, b) => b._timestamp - a._timestamp)
+            .slice(0, 50)
+            .map(({ _timestamp, ...rest }) => rest); // Remove the temp sorting field
 
-            return {
-              id: document.id,
-              title: data.title,
-              message: data.message,
-              type: data.type,
-              targetAudience: data.targetAudience,
-              sentDate: data.sentDate?.toDate?.()?.toISOString?.()?.split('T')[0] || 'N/A',
-              sentBy: data.sentBy,
-              totalSent,
-              readCount,
-            };
-          })
-        );
-
-        onNotificationsUpdate(notifications);
+          console.log(`✅ Processed ${notifications.length} unique notifications successfully`);
+          onNotificationsUpdate(notifications);
+        } catch (processingError) {
+          console.error('❌ Error processing notifications:', processingError);
+          if (onError) {
+            onError(processingError as Error);
+          }
+        }
       },
       (error) => {
-        console.error('Error listening to admin notifications:', error);
+        console.error('❌ Error listening to admin notifications:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
         if (onError) {
           onError(error);
         }
@@ -526,8 +694,12 @@ export const listenToAdminNotifications = (
 
     return unsubscribe;
   } catch (error) {
-    console.error('Error setting up admin notification listener:', error);
-    throw error;
+    console.error('❌ Error setting up admin notification listener:', error);
+    if (onError) {
+      onError(error as Error);
+    }
+    // Return a no-op function if setup fails
+    return () => {};
   }
 };
 

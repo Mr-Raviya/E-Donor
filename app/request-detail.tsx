@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,7 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppearance } from './contexts/AppearanceContext';
-import { DonationRequest, fetchDonationRequestById } from './services/donationRequestService';
+import { useUser } from './contexts/UserContext';
+import { acceptDonationRequest, DonationRequest, fetchDonationRequestById } from './services/donationRequestService';
 
 const normalizeUrgencyLabel = (value?: string) => {
   const normalized = (value || '').toLowerCase();
@@ -64,12 +68,16 @@ const formatRequiredBy = (value?: string): string => {
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { themeMode } = useAppearance();
+  const { user } = useUser();
   const isDark = themeMode === 'dark';
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [request, setRequest] = useState<DonationRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [acceptanceStatus, setAcceptanceStatus] = useState<'idle' | 'pending' | 'accepted'>('idle');
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const styles = createStyles(isDark);
 
   useEffect(() => {
@@ -92,6 +100,13 @@ export default function RequestDetailScreen() {
         } else {
           setRequest(data);
           setError(null);
+          // Check if user has already accepted this request
+          if (data.acceptedBy && user && data.acceptedBy === user.uid) {
+            setAcceptanceStatus('pending');
+          } else if (data.status === 'pending' || data.status === 'accepted') {
+            // Someone else accepted or it's already in progress
+            setAcceptanceStatus(data.status as 'pending' | 'accepted');
+          }
         }
       })
       .catch((err) => {
@@ -109,7 +124,59 @@ export default function RequestDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [requestId]);
+  }, [requestId, user]);
+
+  const handleAcceptRequest = async () => {
+    if (!requestId || !user || !request) {
+      Alert.alert('Error', 'Unable to accept request. Please try again.');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsSubmitting(true);
+
+    try {
+      // Update the donation request status
+      await acceptDonationRequest(
+        requestId,
+        user.uid,
+        user.displayName || user.name || 'Anonymous Donor',
+        user.phone || '',
+        user.bloodType || ''
+      );
+      
+      // Create a donation record in user's donation history
+      await createUserDonation({
+        donorId: user.uid,
+        donorName: user.displayName || user.name || 'Anonymous Donor',
+        donorPhone: user.phone || '',
+        donorBloodType: user.bloodType || '',
+        requestId: requestId,
+        bloodType: request.bloodType || '',
+        units: request.units || 1,
+        patientName: request.patientName || 'Unknown Patient',
+        medicalCondition: request.medicalCondition || '',
+        hospital: request.hospital || '',
+        hospitalId: request.hospitalId || '',
+        hospitalDepartment: request.hospitalDepartment || '',
+        location: buildLocationText(request),
+        notes: request.notes || '',
+      });
+      
+      setAcceptanceStatus('pending');
+      setShowAcceptModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error('Error accepting request:', err);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        'Error',
+        'Failed to accept the request. Please check your connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const displayData = useMemo(() => {
     if (!request) return null;
@@ -308,12 +375,32 @@ export default function RequestDetailScreen() {
         </ScrollView>
 
         <View style={styles.footerActions}>
-          <TouchableOpacity style={styles.acceptButton} activeOpacity={0.9}>
-            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.acceptButtonText} numberOfLines={1}>
-              Accept
-            </Text>
-          </TouchableOpacity>
+          {acceptanceStatus === 'pending' ? (
+            <View style={[styles.acceptButton, styles.pendingButton]}>
+              <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.acceptButtonText} numberOfLines={1}>
+                Pending
+              </Text>
+            </View>
+          ) : isSubmitting ? (
+            <View style={[styles.acceptButton, { opacity: 0.7 }]}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.acceptButtonText} numberOfLines={1}>
+                Accepting...
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.acceptButton} 
+              activeOpacity={0.9}
+              onPress={handleAcceptRequest}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.acceptButtonText} numberOfLines={1}>
+                Accept
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={styles.chatButton} 
             activeOpacity={0.9}
@@ -332,6 +419,69 @@ export default function RequestDetailScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Accept Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={showAcceptModal}
+        onRequestClose={() => setShowAcceptModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: isDark ? '#2a2a2a' : '#fff' }]}>
+            {/* Success Icon */}
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+            </View>
+            
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#111827' }]}>
+              Request Accepted!
+            </Text>
+            <Text style={[styles.modalMessage, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              You have accepted to donate blood for this request. Your donation is now{' '}
+              <Text style={{ fontWeight: '700', color: '#F59E0B' }}>pending</Text>.
+            </Text>
+            
+            {/* Request Summary */}
+            <View style={[styles.modalSummary, { backgroundColor: isDark ? '#374151' : '#F3F4F6' }]}>
+              <View style={styles.modalSummaryRow}>
+                <Ionicons name="water" size={18} color="#DC2626" />
+                <Text style={[styles.modalSummaryText, { color: isDark ? '#D1D5DB' : '#374151' }]}>
+                  Blood Type: <Text style={{ fontWeight: '700' }}>{displayData.bloodType}</Text>
+                </Text>
+              </View>
+              <View style={styles.modalSummaryRow}>
+                <Ionicons name="business" size={18} color="#DC2626" />
+                <Text style={[styles.modalSummaryText, { color: isDark ? '#D1D5DB' : '#374151' }]}>
+                  {displayData.hospitalName}
+                </Text>
+              </View>
+              <View style={styles.modalSummaryRow}>
+                <Ionicons name="time" size={18} color="#F59E0B" />
+                <Text style={[styles.modalSummaryText, { color: '#F59E0B', fontWeight: '600' }]}>
+                  Status: Pending Donation
+                </Text>
+              </View>
+            </View>
+            
+            <Text style={[styles.modalNote, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              The hospital will contact you shortly with further instructions.
+            </Text>
+            
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setShowAcceptModal(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalCloseButtonText}>Got it!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -585,6 +735,9 @@ const createStyles = (isDark: boolean) => {
     justifyContent: 'center',
     gap: 8,
   },
+  pendingButton: {
+    backgroundColor: '#F59E0B',
+  },
   acceptButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -611,6 +764,82 @@ const createStyles = (isDark: boolean) => {
     fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 32,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    elevation: 15,
+  },
+  modalIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalSummary: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  modalSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalSummaryText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  modalNote: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
+    fontStyle: 'italic',
+  },
+  modalCloseButton: {
+    width: '100%',
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
 };

@@ -1,15 +1,15 @@
 import {
-  collection,
-  doc,
-  DocumentData,
-  deleteDoc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
-  QueryDocumentSnapshot,
-  serverTimestamp,
-  updateDoc,
+    collection,
+    deleteDoc,
+    doc,
+    DocumentData,
+    getDoc,
+    onSnapshot,
+    orderBy,
+    query,
+    QueryDocumentSnapshot,
+    serverTimestamp,
+    updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -47,6 +47,12 @@ export type DonationRequest = {
   source?: string;
   createdAt?: Date | null;
   updatedAt?: Date | null;
+  // Acceptance fields
+  acceptedBy?: string;
+  acceptedByName?: string;
+  acceptedByPhone?: string;
+  acceptedByBloodType?: string;
+  acceptedAt?: Date | null;
 };
 
 const donationRequestsCollection = collection(db, 'donation_requests');
@@ -99,6 +105,12 @@ const mapSnapshotToDonationRequest = (
     source: data.source ?? '',
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
+    // Acceptance fields
+    acceptedBy: data.acceptedBy ?? '',
+    acceptedByName: data.acceptedByName ?? '',
+    acceptedByPhone: data.acceptedByPhone ?? '',
+    acceptedByBloodType: data.acceptedByBloodType ?? '',
+    acceptedAt: toDate(data.acceptedAt),
   };
 };
 
@@ -135,6 +147,25 @@ export const updateDonationRequestStatus = async (
   if (!id) return;
   await updateDoc(doc(donationRequestsCollection, id), {
     status,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const acceptDonationRequest = async (
+  requestId: string,
+  donorId: string,
+  donorName: string,
+  donorPhone: string,
+  donorBloodType: string,
+): Promise<void> => {
+  if (!requestId || !donorId) return;
+  await updateDoc(doc(donationRequestsCollection, requestId), {
+    status: 'pending',
+    acceptedBy: donorId,
+    acceptedByName: donorName,
+    acceptedByPhone: donorPhone,
+    acceptedByBloodType: donorBloodType,
+    acceptedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 };

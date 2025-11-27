@@ -87,12 +87,22 @@ export function useDashboardStats(): DashboardStats {
       }
     );
 
-    // Real-time listener for notifications count
-    const notificationsQuery = query(collection(db, 'notifications'));
+    // Real-time listener for notifications count - count unique notifications from userNotifications
+    const notificationsQuery = query(collection(db, 'userNotifications'));
     const unsubscribeNotifications = onSnapshot(
       notificationsQuery,
       (snapshot) => {
-        setStats((prev) => ({ ...prev, totalNotifications: snapshot.size }));
+        // Group by notificationId to get unique notification count
+        const uniqueNotifications = new Set<string>();
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.deleted !== true) {
+            // Use notificationId if available, otherwise use title+message combo
+            const key = data.notificationId || `${data.title}_${data.message}`.substring(0, 100);
+            uniqueNotifications.add(key);
+          }
+        });
+        setStats((prev) => ({ ...prev, totalNotifications: uniqueNotifications.size }));
       },
       (error) => {
         console.error('Error listening to notifications:', error);

@@ -398,6 +398,14 @@ export default function SignUpScreen() {
 
     setCreatingAccount(true);
     try {
+      console.log('🔵 Sign up starting with data:', {
+        email: trimmedEmail,
+        name: fullName,
+        phone: trimmedPhone,
+        location: trimmedCity,
+        bloodType: selectedBloodType,
+      });
+      
       // Sign up with complete profile information
       await signUpWithPassword(
         trimmedEmail,
@@ -410,20 +418,10 @@ export default function SignUpScreen() {
           location: trimmedCity,
           bloodType: selectedBloodType ?? 'O+',
           medicalNotes: '',
-          // Add any other fields you want to save
         },
       );
       
-      // Update user profile with all details
-      await updateUser({
-        name: fullName,
-        email: trimmedEmail,
-        phone: trimmedPhone,
-        location: trimmedCity,
-        medicalNotes: '',
-        bloodType: selectedBloodType ?? 'O+',
-      });
-      
+      console.log('✅ Sign up completed, showing success modal');
       setSuccessModalVisible(true);
     } catch (error: any) {
       const rawMessage = error?.message ?? (error instanceof Error ? error.message : '');

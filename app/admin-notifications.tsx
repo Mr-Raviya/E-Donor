@@ -3,23 +3,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../lib/firebase';
 import {
-  deleteAdminNotification,
-  listenToAdminNotifications,
-  sendNotification
+    deleteAdminNotification,
+    listenToAdminNotifications,
+    sendNotification
 } from './services/notificationService';
 
 interface Notification {
@@ -107,21 +107,27 @@ export default function AdminNotifications() {
   // Real-time listener for notifications
   useEffect(() => {
     setLoading(true);
+    console.log('🔔 Admin Notifications: Setting up listener...');
     
     const unsubscribe = listenToAdminNotifications(
       (updatedNotifications) => {
+        console.log(`📬 Admin Notifications: Received ${updatedNotifications.length} notifications`);
         setNotifications(updatedNotifications);
         setLoading(false);
       },
       (error) => {
-        console.error('Error listening to notifications:', error);
-        Alert.alert('Error', 'Failed to load notifications');
+        console.error('❌ Admin Notifications: Error listening to notifications:', error);
+        Alert.alert('Error', `Failed to load notifications: ${error.message || 'Unknown error'}`);
+        setNotifications([]);
         setLoading(false);
       }
     );
 
     // Cleanup listener on unmount
-    return () => unsubscribe();
+    return () => {
+      console.log('🔕 Admin Notifications: Cleaning up listener');
+      unsubscribe();
+    };
   }, []);
 
   const handleSendNotification = async () => {

@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  User,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  updateProfile,
-  sendEmailVerification,
+    User,
+    createUserWithEmailAndPassword,
+    signOut as firebaseSignOut,
+    onAuthStateChanged,
+    sendEmailVerification,
+    signInWithEmailAndPassword,
+    updateProfile,
 } from 'firebase/auth';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
@@ -72,6 +72,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const syncProfileWithBackend = useCallback(
     async (userId: string, fallback?: Partial<UserProfile>) => {
       try {
+        console.log('🔄 syncProfileWithBackend called with:', { userId, fallback });
+        
         const adminRecord = await fetchAdminRecord(userId);
         if (adminRecord) {
           setIsAdminAccount(true);
@@ -80,6 +82,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsAdminAccount(false);
 
         const remoteProfile = await fetchUserProfile(userId);
+        console.log('📥 Fetched remote profile:', remoteProfile);
 
         if (remoteProfile) {
           // Check if account is deactivated
@@ -90,24 +93,60 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             setUser(defaultUser);
             setSession(null);
             return;
-        }
+          }
         
-        // Profile exists, load it
-        setUser(remoteProfile);
-        return;
-      }
+          // Profile exists - check if fallback has NEW data that's not already in the profile
+          // Only merge if fallback has phone, location, or bloodType (signup data)
+          const hasNewProfileData = fallback && (
+            (fallback.phone && fallback.phone !== remoteProfile.phone) ||
+            (fallback.location && fallback.location !== remoteProfile.location) ||
+            (fallback.bloodType && fallback.bloodType !== remoteProfile.bloodType)
+          );
+          
+          if (hasNewProfileData) {
+            console.log('🔀 Merging existing profile with NEW fallback data');
+            // Merge remote profile with new fallback data, only override with non-empty values
+            const mergedProfile = {
+              ...remoteProfile,
+              ...(fallback.phone && { phone: fallback.phone }),
+              ...(fallback.location && { location: fallback.location }),
+              ...(fallback.bloodType && { bloodType: fallback.bloodType }),
+              ...(fallback.name && { name: fallback.name }),
+              ...(fallback.email && { email: fallback.email }),
+            };
+            
+            console.log('📝 Merged profile to save:', mergedProfile);
+            const updatedProfile = await upsertUserProfile(userId, mergedProfile);
+            setUser(updatedProfile);
+            return;
+          }
+          
+          // No new data to merge, just load existing profile (normal login)
+          console.log('✅ Loading existing profile (no changes needed)');
+          setUser(remoteProfile);
+          return;
+        }
 
         // Create new profile with fallback data (for new users)
-        // Merge defaultUser with fallback to ensure all required fields are present
-        const profileData = {
-          ...defaultUser,
-          ...fallback, // Override with actual user data
+        console.log('🆕 Creating new profile for user');
+        const profileData: Partial<UserProfile> = {
+          name: fallback?.name || 'User',
+          email: fallback?.email || '',
+          phone: fallback?.phone || '',
+          location: fallback?.location || '',
+          bloodType: fallback?.bloodType || 'O+',
+          medicalNotes: fallback?.medicalNotes || '',
+          status: 'active',
+          donationCount: 0,
+          donorLevel: 'Bronze',
         };
         
+        console.log('📝 New profile data to save:', profileData);
         const seededProfile = await upsertUserProfile(userId, profileData);
+        console.log('✅ Profile created:', seededProfile);
         setUser(seededProfile);
       } catch (error) {
-        console.error('Failed to sync profile:', error);
+        console.error('❌ Failed to sync profile:', error);
         // Don't throw error to avoid uncaught promise rejection
       }
     },
@@ -144,9 +183,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             }
 
             setSession(firebaseUser);
+            // Only pass email/name - syncProfileWithBackend will load existing profile
+            // and only create new if none exists
             await syncProfileWithBackend(firebaseUser.uid, {
               email: firebaseUser.email ?? undefined,
-              name: firebaseUser.displayName ?? defaultUser.name,
+              name: firebaseUser.displayName ?? undefined,
             });
           } else {
             setUser(defaultUser);
@@ -279,12 +320,28 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             await updateProfile(firebaseUser, { displayName: fullName });
           }
           
-          console.log('💾 Saving profile data:', { email, name: fullName, ...profileExtras });
-          await syncProfileWithBackend(firebaseUser.uid, {
-            email,
-            name: fullName ?? defaultUser.name,
-            ...profileExtras,
-          });
+          // Save profile directly using upsertUserProfile (not syncProfileWithBackend)
+          // This ensures data is saved while user is still authenticated
+          const profileData: Partial<UserProfile> = {
+            name: fullName ?? 'User',
+            email: email,
+            phone: profileExtras?.phone || '',
+            location: profileExtras?.location || '',
+            bloodType: profileExtras?.bloodType || 'O+',
+            medicalNotes: profileExtras?.medicalNotes || '',
+            status: 'active',
+            donationCount: 0,
+            donorLevel: 'Bronze',
+          };
+          
+          console.log('💾 Saving profile data directly:', profileData);
+          try {
+            await upsertUserProfile(firebaseUser.uid, profileData);
+            console.log('✅ Profile saved successfully!');
+          } catch (profileError) {
+            console.error('❌ Failed to save profile:', profileError);
+            // Continue with signup even if profile save fails - user can update later
+          }
           
           console.log('✅ Sign up completed successfully!');
 
@@ -299,7 +356,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
     },
-    [syncProfileWithBackend],
+    [],
   );
 
   const signOut = useCallback(async () => {
